@@ -126,10 +126,23 @@ app.get('/watch/:linkId', async (req, res) => {
   const { linkId } = req.params;
   const link = db.data.links[linkId];
   if (!link) return res.status(404).send(`<!DOCTYPE html><html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:sans-serif"><h2>Линк олдсонгүй</h2></body></html>`);
+
   const age = Date.now() - link.createdAt;
   if (age > 72 * 60 * 60 * 1000) return res.status(410).send(`<!DOCTYPE html><html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:sans-serif"><h2>⏰ Линкийн хугацаа дууссан</h2><p>72 цагийн хугацаа өнгөрсөн байна.</p></body></html>`);
+
+  // IP-based locking
+  const userIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.socket.remoteAddress;
+  if (link.lockedIp && link.lockedIp !== userIp) {
+    return res.status(403).send(`<!DOCTYPE html><html><body style="background:#000;color:#f66;text-align:center;padding:50px;font-family:sans-serif"><h2>🔒 Хандах боломжгүй</h2><p>Энэ линкийг өөр сүлжээнээс аль хэдийн нээсэн байна.</p><p>Линк зөвхөн нэг хүнд зориулагдсан.</p></body></html>`);
+  }
+  if (!link.lockedIp) {
+    link.lockedIp = userIp;
+    db.save();
+  }
+
   const video = db.data.videos[link.videoId];
   if (!video) return res.status(404).send(`<!DOCTYPE html><html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:sans-serif"><h2>Видео олдсонгүй</h2></body></html>`);
+
   try {
     const command = new GetObjectCommand({ Bucket: BUCKET, Key: video.r2Key || video.filename });
     const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
