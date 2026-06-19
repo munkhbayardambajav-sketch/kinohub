@@ -122,26 +122,43 @@ app.get('/admin/videos', requireAdmin, (req, res) => res.json(Object.values(db.d
 app.get('/admin/links', requireAdmin, (req, res) => res.json(Object.values(db.data.links || {})));
 
 // Watch: нэг линк = нэг хүн = нэг төхөөрөмж
-app.get('/watch/:linkId', (req, res) => {
+app.get('/watch/:linkId', async (req, res) => {
   const { linkId } = req.params;
-  const link = db.getLink(linkId);
-  if (!link) return res.status(404).send(errorPage('Линк олдсонгүй', 'Энэ линк байхгүй эсвэл устсан байна.'));
-  const cookies = parseCookies(req);
-  const cookieName = 'v_' + linkId;
-  const cookieToken = cookies[cookieName];
-  if (link.activatedAt && Date.now() - link.activatedAt > 72 * 3600 * 1000) {
-    return res.status(403).send(errorPage('Хугацаа дууссан', '72 цагийн хугацаа дууссан байна. Шинэ линк аваарай.'));
+  const link = db.data.links[linkId];
+  if (!link) return res.status(404).send(`<!DOCTYPE html><html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:sans-serif"><h2>Линк олдсонгүй</h2></body></html>`);
+  const age = Date.now() - link.createdAt;
+  if (age > 72 * 60 * 60 * 1000) return res.status(410).send(`<!DOCTYPE html><html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:sans-serif"><h2>⏰ Линкийн хугацаа дууссан</h2><p>72 цагийн хугацаа өнгөрсөн байна.</p></body></html>`);
+  const video = db.data.videos[link.videoId];
+  if (!video) return res.status(404).send(`<!DOCTYPE html><html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:sans-serif"><h2>Видео олдсонгүй</h2></body></html>`);
+  try {
+    const command = new GetObjectCommand({ Bucket: BUCKET, Key: video.r2Key || video.filename });
+    const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    res.send(`<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Видео үзэх</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh}
+video{max-width:100%;max-height:100vh;width:100%}
+</style>
+</head>
+<body>
+<video controls autoplay controlsList="nodownload" oncontextmenu="return false">
+<source src="${signedUrl}" type="video/mp4">
+</video>
+<script>
+document.addEventListener('keydown',function(e){if(e.key==='PrintScreen'){e.preventDefault();}});
+</script>
+</body>
+</html>`);
+  } catch(err) {
+    console.error('Watch error:', err);
+    res.status(500).send('Видео ачааллахад алдаа гарлаа');
   }
-  if (!link.activatedAt) {
-    const deviceToken = crypto.randomBytes(32).toString('hex');
-    db.saveLink(linkId, { ...link, activatedAt: Date.now(), deviceToken });
-    res.setHeader('Set-Cookie', cookieName + '=' + deviceToken + '; HttpOnly; Path=/; Max-Age=' + (72 * 3600));
-    return res.send(playerPage(linkId));
-  }
-  if (link.deviceToken && cookieToken === link.deviceToken) return res.send(playerPage(linkId));
-  return res.status(403).send(errorPage('Хандах боломжгүй', 'Энэ линкийг өөр хүн аль хэдийн ашиглаж байна.\n\nЛинк зөвхөн нэг хүн нэг төхөөрөмжид ажиллана.\n\nШинэ линк авахыг хүсвэл дахин төлбөр төлнө үү.'));
-});
-
+})
 app.get('/stream/:linkId', async (req, res) => {
   const { linkId } = req.params;
   const link = db.getLink(linkId);
