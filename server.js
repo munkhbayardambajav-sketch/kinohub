@@ -209,8 +209,27 @@ app.post('/webhook', async (req, res) => {
 });
 
 async function sendBankInfo(recipientId) {
-  const text = process.env.BANK_INFO || '"Аавын найз охин" киног үзэхийн хүсвэл хаан банкны 5300692947 дамбажав мөнхбаяр дансруу 5000 төгрөг шилжүүлнэ үү.';
-  await sendFbMessage(recipientId, text);
+  await sendFbMessage(recipientId, `✅ "Аавын найз охин" кино үзэхийг хүсвэл
+🍿 Кино үзэхийг хүсвэл доорх зааврыг дагаарай:
+
+💰 Төлбөр шилжүүлэх мэдээлэл:
+• Банк: Хаан банк 🏦
+• Дансны дугаар: MN54 000500 5300692947
+• Данс эзэмшигч: Дамбажав Мөнхбаяр
+• Төлбөрийн дүн: 5000 төгрөг
+
+📝 Гүйлгээний утга (заавал бичнэ!): → Өөрийн Facebook нэрээ бичээрэй
+
+📸 Дараагийн алхам:
+1. Гүйлгээ амжилттай болсны скриншотыг авна уу
+2. Энэ чат руу явуулна уу
+
+⏰ Хугацаа:
+• Төлбөр баталгаажсаны дараа линк автоматаар ирнэ
+• Линк 72 цаг (3 хоног) хүчинтэй байна
+
+⚡ Зөвлөмж: Гүйлгээ хийхдээ мэдээллийг яг таг шалгаарай!
+Кино үзэхэд бэлэн болсон уу? 🚀`);
 }
 
 async function handlePaymentScreenshot(senderId, imageUrl) {
@@ -238,8 +257,6 @@ async function handlePaymentScreenshot(senderId, imageUrl) {
     });
     const claudeData = await claudeRes.json();
     const rawText = (claudeData.content && claudeData.content[0] && claudeData.content[0].text) || '';
-    // DEBUG: send raw Claude response to user
-    await sendFbMessage(senderId, '🔍 DEBUG Claude хариу:\n' + rawText.substring(0, 500));
     let parsed = {};
     try { const m = rawText.match(/\{[\s\S]+?\}/); if (m) parsed = JSON.parse(m[0]); } catch(e) {}
 
