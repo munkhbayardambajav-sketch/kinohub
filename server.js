@@ -1,408 +1,240 @@
 const express = require('express');
-const path    = require('path');
-const fs      = require('fs');
-const { nanoid } = require('nanoid');
-const db      = require('./db');
-const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const { nanoid } = require('nanoid');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 
-const app  = express();
+const app = express();
 const PORT = process.env.PORT || 3000;
 
-const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-const ADMIN_PASS = process.env.ADMIN_PASS || 'changeme123';
-const EXPIRY_MS  = 72 * 60 * 60 * 1000;
-
-// ── Cloudflare R2 ─────────────────────────────────────────────────────────────
-const r2 = new S3Client({
+const s3 = new S3Client({
   region: 'auto',
   endpoint: `https://${process.env.CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   credentials: {
-    accessKeyId:     process.env.R2_ACCESS_KEY_ID     || '',
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
   },
 });
-const R2_BUCKET = process.env.R2_BUCKET_NAME || '';
+const BUCKET = process.env.R2_BUCKET_NAME || 'videos';
+
+const DB_PATH = path.join(__dirname, 'db.json');
+function loadDb() {
+  try { if (fs.existsSync(DB_PATH)) return JSON.parse(fs.readFileSync(DB_PATH, 'utf8')); } catch {}
+  return { videos: {}, links: {}, adminSession: null };
+}
+function saveDb(data) { fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2)); }
+
+const db = {
+  get data() { return loadDb(); },
+  saveVideo(id, video) { const d = loadDb(); d.videos[id] = video; saveDb(d); },
+  getVideo(id) { return loadDb().videos[id]; },
+  getLatestVideo() { const v = Object.values(loadDb().videos || {}); return v.length ? v[v.length-1] : null; },
+  saveLink(id, link) { const d = loadDb(); d.links[id] = link; saveDb(d); },
+  getLink(id) { return loadDb().links[id]; },
+  setAdminSession(token) { const d = loadDb(); d.adminSession = token; saveDb(d); },
+  getAdminSession() { return loadDb().adminSession; },
+};
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-function getCookie(req, name) {
-  const cookies = req.headers.cookie || '';
-  const found = cookies.split(';').map(c => c.trim()).find(c => c.startsWith(name + '='));
-  return found ? found.slice(name.length + 1) : null;
+function parseCookies(req) {
+  const cookies = {};
+  (req.headers.cookie || '').split(';').forEach(part => {
+    const [k, ...v] = part.trim().split('=');
+    if (k) cookies[k.trim()] = v.join('=');
+  });
+  return cookies;
 }
-
-const sessions = new Set();
 
 function requireAdmin(req, res, next) {
-  const token = req.headers['x-admin-token'] || req.query.token;
-  if (token && sessions.has(token)) return next();
-  res.status(401).json({ error: 'Нэвтрэх шаардлагатай' });
+  const cookies = parseCookies(req);
+  const session = db.getAdminSession();
+  if (session && cookies.admin_session === session) return next();
+  res.redirect('/admin');
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ADMIN
-// ══════════════════════════════════════════════════════════════════════════════
-
-app.get('/admin', (req, res) => res.send(adminLoginPage()));
+app.get('/admin', (req, res) => {
+  const cookies = parseCookies(req);
+  const session = db.getAdminSession();
+  if (session && cookies.admin_session === session) return res.redirect('/admin/dashboard');
+  res.send('<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><title>Admin</title><style>body{font-family:Arial,sans-serif;background:#0f0f0f;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}.box{background:#1a1a1a;padding:40px;border-radius:12px;width:320px}h2{margin:0 0 24px;text-align:center}input{width:100%;padding:12px;margin-bottom:16px;border:1px solid #333;background:#111;color:#fff;border-radius:8px;box-sizing:border-box;font-size:14px}button{width:100%;padding:12px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer}</style></head><body><div class="box"><h2>Admin</h2><form method="POST" action="/admin/login"><input type="text" name="username" placeholder="Нэвтрэх нэр" required><input type="password" name="password" placeholder="Нууц үг" required><button type="submit">Нэвтрэх</button></form></div></body></html>');
+});
 
 app.post('/admin/login', (req, res) => {
-  const { user, pass } = req.body;
-  if (user === ADMIN_USER && pass === ADMIN_PASS) {
-    const token = nanoid(32);
-    sessions.add(token);
-    res.json({ token });
-  } else {
-    res.status(401).json({ error: 'Буруу мэдээлэл' });
+  const { username, password } = req.body;
+  if (username === (process.env.ADMIN_USER || 'admin') && password === (process.env.ADMIN_PASS || 'Admin1234!')) {
+    const token = crypto.randomBytes(32).toString('hex');
+    db.setAdminSession(token);
+    res.setHeader('Set-Cookie', 'admin_session=' + token + '; HttpOnly; Path=/; Max-Age=86400');
+    return res.redirect('/admin/dashboard');
   }
+  res.send('<script>alert("Нэвтрэх нэр эсвэл нууц үг буруу"); history.back();<\/script>');
 });
 
-app.get('/admin/dashboard', (req, res) => res.send(adminDashboardPage()));
+app.get('/admin/dashboard', requireAdmin, (req, res) => {
+  const videos = Object.values(db.data.videos || {});
+  const links = Object.values(db.data.links || {});
+  const latestVideo = videos.length ? videos[videos.length - 1] : null;
+  const activeCount = links.filter(l => l.activatedAt && Date.now() - l.activatedAt < 72*3600*1000).length;
+  const unusedCount = links.filter(l => !l.activatedAt).length;
+  const rows = links.slice(-20).reverse().map(l => {
+    const a = l.activatedAt && Date.now() - l.activatedAt < 72*3600*1000;
+    const u = !l.activatedAt;
+    const badge = u ? '<span style="background:#451a03;color:#fcd34d;padding:2px 8px;border-radius:4px;font-size:12px">Ашиглаагүй</span>' : a ? '<span style="background:#064e3b;color:#6ee7b7;padding:2px 8px;border-radius:4px;font-size:12px">Идэвхтэй</span>' : '<span style="background:#450a0a;color:#fca5a5;padding:2px 8px;border-radius:4px;font-size:12px">Дууссан</span>';
+    return '<tr><td><a href="/watch/' + l.id + '" target="_blank" style="color:#a5b4fc">' + l.id + '</a></td><td>' + new Date(l.createdAt).toLocaleString('mn-MN') + '</td><td>' + badge + '</td><td>' + (l.activatedAt ? new Date(l.activatedAt).toLocaleString('mn-MN') : '-') + '</td></tr>';
+  }).join('');
+  res.send('<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin Dashboard</title><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;background:#0f0f0f;color:#fff;margin:0;padding:20px}h1{color:#6366f1;margin-bottom:24px}.card{background:#1a1a1a;border-radius:12px;padding:24px;margin-bottom:20px}.card h2{margin:0 0 16px;font-size:18px;color:#a5b4fc}.btn{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:14px;margin:4px}.btn-primary{background:#6366f1;color:#fff}.btn-primary:hover{background:#4f46e5}input[type=file]{width:100%;padding:10px;background:#111;border:1px solid #333;color:#fff;border-radius:8px;font-size:14px;margin-bottom:12px}.stat{display:inline-block;background:#111;padding:12px 20px;border-radius:8px;margin:4px;text-align:center}.stat-num{font-size:28px;font-weight:bold;color:#6366f1}.stat-label{font-size:12px;color:#9ca3af}#progress-bar{width:0%;height:8px;background:#6366f1;border-radius:4px;transition:width 0.3s}#progress-wrap{background:#222;border-radius:4px;margin-top:8px;display:none}#status-msg{margin-top:8px;font-size:14px;color:#9ca3af}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #222}th{color:#9ca3af;font-weight:normal}</style></head><body><h1>Admin Dashboard</h1><div class="card"><h2>Статистик</h2><div class="stat"><div class="stat-num">' + videos.length + '</div><div class="stat-label">Нийт видео</div></div><div class="stat"><div class="stat-num">' + links.length + '</div><div class="stat-label">Нийт линк</div></div><div class="stat"><div class="stat-num">' + activeCount + '</div><div class="stat-label">Идэвхтэй</div></div><div class="stat"><div class="stat-num">' + unusedCount + '</div><div class="stat-label">Ашиглаагүй</div></div></div><div class="card"><h2>Видео оруулах</h2>' + (latestVideo ? '<p style="color:#6ee7b7;font-size:14px;margin-bottom:12px">Одоогийн видео: <strong>' + (latestVideo.filename||latestVideo.id) + '</strong></p>' : '') + '<input type="file" id="video-file" accept="video/*"><div id="progress-wrap"><div id="progress-bar"></div></div><div id="status-msg"></div><button class="btn btn-primary" onclick="uploadVideo()" style="margin-top:8px">Байршуулах</button></div><div class="card"><h2>Линк үүсгэх</h2><button class="btn btn-primary" onclick="createLink()">Шинэ линк үүсгэх</button><div id="link-result" style="margin-top:12px"></div></div><div class="card"><h2>Линкүүд</h2><table><tr><th>Линк ID</th><th>Үүсгэсэн</th><th>Статус</th><th>Нээсэн</th></tr>' + rows + '</table></div><script>async function uploadVideo(){const file=document.getElementById("video-file").files[0];if(!file)return alert("Файл сонгоно уу");const s=document.getElementById("status-msg"),pw=document.getElementById("progress-wrap"),pb=document.getElementById("progress-bar");s.textContent="URL авч байна...";pw.style.display="block";try{const r1=await fetch("/admin/get-upload-url",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:file.name,contentType:file.type})});const{uploadUrl,key}=await r1.json();s.textContent="Байршуулж байна...";await new Promise((res,rej)=>{const x=new XMLHttpRequest();x.upload.onprogress=e=>{if(e.lengthComputable)pb.style.width=(e.loaded/e.total*100)+"%"};x.onload=()=>x.status<300?res():rej(new Error(x.status));x.onerror=rej;x.open("PUT",uploadUrl);x.setRequestHeader("Content-Type",file.type);x.send(file)});s.textContent="Бүртгэж байна...";await fetch("/admin/register-video",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key,filename:file.name,size:file.size,contentType:file.type})});s.textContent="Амжилттай!";pb.style.background="#10b981";setTimeout(()=>location.reload(),1500)}catch(e){s.textContent="Алдаа: "+e.message;pb.style.background="#ef4444"}}async function createLink(){const r=await fetch("/admin/create-link",{method:"POST"});const d=await r.json();if(d.linkUrl){document.getElementById("link-result").innerHTML="<div style=\\"background:#111;padding:12px;border-radius:8px;word-break:break-all\\"><a href=\\""+d.linkUrl+"\\" target=\\"_blank\\" style=\\"color:#6ee7b7\\">"+d.linkUrl+"</a></div>"}else{document.getElementById("link-result").innerHTML="<p style=\\"color:#f87171\\">"+( d.error||"Алдаа")+"</p>"}}<\/script></body></html>');
+});
 
-// Presigned PUT URL — browser шууд R2-р уу хуулна
 app.post('/admin/get-upload-url', requireAdmin, async (req, res) => {
-  const { filename } = req.body;
-  const key = `videos/${Date.now()}-${filename}`;
   try {
-    const url = await getSignedUrl(r2, new PutObjectCommand({
-      Bucket: R2_BUCKET, Key: key, ContentType: 'video/mp4'
-    }), { expiresIn: 7200 });
-    res.json({ uploadUrl: url, key });
-  } catch (err) {
-    console.error('Presign error:', err);
-    res.status(500).json({ error: 'URL үүсгэхэд алдаа гарлаа' });
-  }
+    const { filename, contentType } = req.body;
+    const ext = path.extname(filename) || '.mp4';
+    const key = 'videos/' + nanoid(16) + ext;
+    const command = new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: contentType || 'video/mp4' });
+    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    res.json({ uploadUrl, key });
+  } catch (err) { console.error('get-upload-url error:', err); res.status(500).json({ error: err.message }); }
 });
 
-// R2-д хуулсны дараа видео бүртгэнэ
 app.post('/admin/register-video', requireAdmin, (req, res) => {
-  const { key, filename } = req.body;
-  const videoId = nanoid(16);
-  db.saveVideo(videoId, { id: videoId, key, originalName: filename, uploadedAt: Date.now() });
-  res.json({ videoId, name: filename });
+  try {
+    const { key, filename, size, contentType } = req.body;
+    const id = nanoid(10);
+    db.saveVideo(id, { id, key, filename, size, contentType, uploadedAt: Date.now() });
+    res.json({ id, key });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/admin/videos', requireAdmin, (req, res) => {
-  const raw    = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'db.json'), 'utf8'));
-  const videos = Object.values(raw.videos || {}).map(v => ({ id: v.id, name: v.originalName }));
-  res.json(videos);
+app.post('/admin/create-link', requireAdmin, (req, res) => {
+  const video = db.getLatestVideo();
+  if (!video) return res.json({ error: 'Видео байхгүй байна' });
+  const linkId = nanoid(10);
+  db.saveLink(linkId, { id: linkId, videoId: video.id, createdAt: Date.now() });
+  const baseUrl = process.env.BASE_URL || ('https://' + req.headers.host);
+  res.json({ linkId, linkUrl: baseUrl + '/watch/' + linkId });
 });
 
-app.post('/admin/generate-links', requireAdmin, (req, res) => {
-  const { videoId, count = 1 } = req.body;
-  if (!db.getVideo(videoId)) return res.status(404).json({ error: 'Видео олдсонгүй' });
-  const links = [];
-  for (let i = 0; i < Math.min(count, 500); i++) {
-    const linkId = nanoid(12);
-    db.saveLink(linkId, { id: linkId, videoId, createdAt: Date.now() });
-    links.push(linkId);
+app.get('/admin/videos', requireAdmin, (req, res) => res.json(Object.values(db.data.videos || {})));
+app.get('/admin/links', requireAdmin, (req, res) => res.json(Object.values(db.data.links || {})));
+
+// Watch: нэг линк = нэг хүн = нэг төхөөрөмж
+app.get('/watch/:linkId', (req, res) => {
+  const { linkId } = req.params;
+  const link = db.getLink(linkId);
+  if (!link) return res.status(404).send(errorPage('Линк олдсонгүй', 'Энэ линк байхгүй эсвэл устсан байна.'));
+  const cookies = parseCookies(req);
+  const cookieName = 'v_' + linkId;
+  const cookieToken = cookies[cookieName];
+  if (link.activatedAt && Date.now() - link.activatedAt > 72 * 3600 * 1000) {
+    return res.status(403).send(errorPage('Хугацаа дууссан', '72 цагийн хугацаа дууссан байна. Шинэ линк аваарай.'));
   }
-  res.json({ links });
-});
-
-app.get('/admin/links', requireAdmin, (req, res) => {
-  const links = Object.values(db.getAllLinks()).sort((a, b) => b.createdAt - a.createdAt);
-  res.json(links);
-});
-
-// ══════════════════════════════════════════════════════════════════════════════
-// PUBLIC
-// ══════════════════════════════════════════════════════════════════════════════
-
-app.get('/buy/:linkId', (req, res) => {
-  const link = db.getLink(req.params.linkId);
-  if (!link) return res.status(404).send(errorPage('Линк олдсонгүй', 'Энэ линк байхгүй эсвэл буруу байна.'));
-
-  const cookieName = 'v_' + link.id;
-  const existing   = getCookie(req, cookieName);
-
-  if (existing) {
-    const expiresAt = parseInt(existing, 10);
-    if (Date.now() < expiresAt) return res.redirect('/v/' + link.id + '?t=' + existing);
-    else return res.status(410).send(errorPage('Хугацаа дууссан', 'Энэ төхөөрөмж дээр 72 цагийн хугацаа дуусжээ.'));
+  if (!link.activatedAt) {
+    const deviceToken = crypto.randomBytes(32).toString('hex');
+    db.saveLink(linkId, { ...link, activatedAt: Date.now(), deviceToken });
+    res.setHeader('Set-Cookie', cookieName + '=' + deviceToken + '; HttpOnly; Path=/; Max-Age=' + (72 * 3600));
+    return res.send(playerPage(linkId));
   }
-
-  const expiresAt = Date.now() + EXPIRY_MS;
-  const expires   = new Date(expiresAt).toUTCString();
-  res.setHeader('Set-Cookie', `${cookieName}=${expiresAt}; Expires=${expires}; Path=/; HttpOnly; SameSite=Strict`);
-  res.redirect('/v/' + link.id + '?t=' + expiresAt);
+  if (link.deviceToken && cookieToken === link.deviceToken) return res.send(playerPage(linkId));
+  return res.status(403).send(errorPage('Хандах боломжгүй', 'Энэ линкийг өөр хүн аль хэдийн ашиглаж байна.\n\nЛинк зөвхөн нэг хүн нэг төхөөрөмжид ажиллана.\n\nШинэ линк авахыг хүсвэл дахин төлбөр төлнө үү.'));
 });
 
-app.get('/v/:linkId', (req, res) => {
-  const link = db.getLink(req.params.linkId);
-  if (!link) return res.status(404).send(errorPage('Линк олдсонгүй', 'Энэ линк байхгүй.'));
-
-  const cookieName = 'v_' + link.id;
-  const existing   = getCookie(req, cookieName);
-  if (!existing || Date.now() >= parseInt(existing, 10)) return res.redirect('/buy/' + link.id);
-
-  const video = db.getVideo(link.videoId);
-  if (!video) return res.status(404).send(errorPage('Видео олдсонгүй', 'Видео байхгүй байна.'));
-
-  const expiresAt = parseInt(existing, 10);
-  const remaining = Math.round((expiresAt - Date.now()) / 3600000 * 10) / 10;
-  const watermark = link.id + ' · ' + new Date().toLocaleDateString('mn-MN');
-
-  res.send(`<!DOCTYPE html>
-<html lang="mn"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Кино үзэх</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;user-select:none;-webkit-user-select:none}
-.wrap{position:relative;width:100%;max-width:100vw}
-video{max-width:100vw;max-height:90vh;width:100%;display:block}
-.wm{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;display:flex;flex-direction:column;justify-content:space-between;padding:12px}
-.wm-text{font-family:monospace;font-size:13px;color:rgba(255,255,255,0.15);font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.8)}
-.wm-text.b{align-self:flex-end}
-.guard{position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;z-index:9999;display:none;align-items:center;justify-content:center;color:#fff;font-size:18px;font-family:system-ui}
-.notice{color:#444;font-family:system-ui,sans-serif;font-size:12px;padding:8px;text-align:center}
-</style>
-</head><body>
-<div class="guard" id="guard">⛔ Хамгаалагдсан агуулга</div>
-<div class="wrap">
-  <video controls autoplay controlsList="nodownload nofullscreen noremoteplayback" disablePictureInPicture oncontextmenu="return false" id="vid">
-    <source src="/stream/${link.id}" type="video/mp4">
-  </video>
-  <div class="wm">
-    <span class="wm-text">${watermark}</span>
-    <span class="wm-text b">${watermark}</span>
-  </div>
-</div>
-<p class="notice">⏱ ${remaining} цаг үлдсэн &nbsp;|&nbsp; 🔒 Хуулбарлахыг хориглоно</p>
-<script>
-document.addEventListener('contextmenu', e => e.preventDefault());
-document.addEventListener('keydown', e => {
-  if (e.key === 'F12' || (e.ctrlKey && ['u','s','p','c'].includes(e.key.toLowerCase()))) e.preventDefault();
-});
-document.addEventListener('visibilitychange', () => {
-  const g = document.getElementById('guard'), v = document.getElementById('vid');
-  if (document.hidden) { v.pause(); g.style.display = 'flex'; }
-  else g.style.display = 'none';
-});
-document.getElementById('vid').addEventListener('enterpictureinpicture', () => document.exitPictureInPicture());
-</script>
-</body></html>`);
-});
-
-// Cookie шалгаад R2 presigned GET URL руу redirect
 app.get('/stream/:linkId', async (req, res) => {
-  const link = db.getLink(req.params.linkId);
-  if (!link) return res.status(404).end();
-
-  const cookieName = 'v_' + link.id;
-  const existing   = getCookie(req, cookieName);
-  if (!existing || Date.now() >= parseInt(existing, 10)) return res.status(403).end();
-
+  const { linkId } = req.params;
+  const link = db.getLink(linkId);
+  if (!link) return res.status(404).json({ error: 'Линк олдсонгүй' });
+  const cookies = parseCookies(req);
+  const cookieToken = cookies['v_' + linkId];
+  if (!link.activatedAt || Date.now() - link.activatedAt > 72 * 3600 * 1000) return res.status(403).json({ error: 'Хугацаа дууссан' });
+  if (!link.deviceToken || cookieToken !== link.deviceToken) return res.status(403).json({ error: 'Зөвшөөрөлгүй' });
   const video = db.getVideo(link.videoId);
-  if (!video) return res.status(404).end();
-
+  if (!video) return res.status(404).json({ error: 'Видео олдсонгүй' });
   try {
-    const signedUrl = await getSignedUrl(r2, new GetObjectCommand({
-      Bucket: R2_BUCKET, Key: video.key
-    }), { expiresIn: 14400 }); // 4 цаг
+    const command = new GetObjectCommand({ Bucket: BUCKET, Key: video.key });
+    const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
     res.redirect(signedUrl);
-  } catch (err) {
-    console.error('Stream error:', err);
-    res.status(500).end();
+  } catch (err) { console.error('stream error:', err); res.status(500).json({ error: err.message }); }
+});
+
+function playerPage(linkId) {
+  return '<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Видео</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;user-select:none}#player{width:100%;max-width:900px;aspect-ratio:16/9;background:#111;border-radius:8px;overflow:hidden}video{width:100%;height:100%}.info{margin-top:14px;font-size:13px;color:#6b7280;text-align:center}.warn{margin-top:6px;font-size:12px;color:#f59e0b;text-align:center}</style><script>document.addEventListener("contextmenu",e=>e.preventDefault());document.addEventListener("keydown",e=>{if(e.key==="F12"||(e.ctrlKey&&e.shiftKey&&["I","J","C","K"].includes(e.key))||(e.ctrlKey&&e.key==="U"))e.preventDefault();});<\/script></head><body><div id="player"><video controls autoplay controlsList="nodownload" disablePictureInPicture oncontextmenu="return false"><source src="/stream/' + linkId + '" type="video/mp4">Дэмжихгүй байна.</video></div><div class="info">72 цагийн дотор үзэх боломжтой</div><div class="warn">Линк зөвхөн таны төхөөрөмжид ажиллана — дамжуулбал ажиллахгүй</div></body></html>';
+}
+
+function errorPage(title, message) {
+  return '<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><title>' + title + '</title><style>body{font-family:Arial,sans-serif;background:#0f0f0f;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:20px}.box{max-width:440px}h1{font-size:22px;margin-bottom:16px;color:#f87171}p{color:#9ca3af;line-height:1.7;white-space:pre-line;font-size:15px}</style></head><body><div class="box"><h1>' + title + '</h1><p>' + message + '</p></div></body></html>';
+}
+
+// Facebook Messenger Bot
+app.get('/webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  if (mode === 'subscribe' && token === process.env.FB_VERIFY_TOKEN) {
+    res.status(200).send(challenge);
+  } else { res.status(403).end(); }
+});
+
+app.post('/webhook', async (req, res) => {
+  const body = req.body;
+  if (body.object !== 'page') return res.status(404).end();
+  res.status(200).send('EVENT_RECEIVED');
+  for (const entry of (body.entry || [])) {
+    for (const event of (entry.messaging || [])) {
+      const senderId = event.sender && event.sender.id;
+      if (!senderId || senderId === entry.id) continue;
+      if (event.message) {
+        const hasImage = (event.message.attachments || []).some(a => a.type === 'image');
+        if (hasImage) await handlePaymentScreenshot(senderId);
+        else if (event.message.text) await sendBankInfo(senderId);
+      }
+    }
+    for (const change of (entry.changes || [])) {
+      if (change.field === 'feed' && change.value && change.value.item === 'comment') {
+        const comment = (change.value.message || '').trim();
+        const commenterId = change.value.from && change.value.from.id;
+        if (!commenterId) continue;
+        if (comment === '1' || /авна|үзнэ|авмаар/i.test(comment)) {
+          await sendBankInfo(commenterId);
+        }
+      }
+    }
   }
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// HTML helpers
-// ══════════════════════════════════════════════════════════════════════════════
-
-function adminLoginPage() {
-  return `<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin</title>
-<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:#0f0f0f;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh}.card{background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:40px;width:100%;max-width:360px}h1{font-size:20px;margin-bottom:24px;text-align:center}input{width:100%;padding:12px 14px;background:#111;border:1px solid #333;border-radius:8px;color:#fff;font-size:14px;margin-bottom:12px}button{width:100%;padding:12px;background:#6c47ff;border:none;border-radius:8px;color:#fff;font-size:15px;font-weight:600;cursor:pointer}.err{color:#ff5c5c;font-size:13px;margin-top:10px;text-align:center;display:none}</style></head>
-<body><div class="card"><h1>🔐 Admin</h1><input type="text" id="u" placeholder="Нэвтрэх нэр"/><input type="password" id="p" placeholder="Нууц үг"/><button onclick="login()">Нэвтрэх</button><p class="err" id="err">Буруу мэдээлэл</p></div>
-<script>async function login(){const r=await fetch('/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:document.getElementById('u').value,pass:document.getElementById('p').value})});const d=await r.json();if(d.token){localStorage.setItem('token',d.token);location.href='/admin/dashboard';}else document.getElementById('err').style.display='block';}document.addEventListener('keydown',e=>e.key==='Enter'&&login());</script>
-</body></html>`;
+async function sendBankInfo(recipientId) {
+  const bankInfo = process.env.BANK_INFO || 'Хаан банк: 5000XXXX';
+  const price = process.env.VIDEO_PRICE || '5000';
+  const text = 'Сайн байна уу!\n\nКино үзэхийн тулд доорх дансанд мөнгө шилжүүлнэ үү:\n\n' + bankInfo + '\nҮнэ: ' + price + '\u20ae\n\nТөлбөр төлсний дараа гүйлгээний screenshot-г энд явуулна уу.\nАвтоматаар видео линк очих болно!';
+  await sendFbMessage(recipientId, text);
 }
 
-function adminDashboardPage() {
-  return `<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KINOHUB Admin</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;background:#0f0f0f;color:#fff;padding:24px;max-width:860px;margin:0 auto}
-h1{font-size:22px;margin-bottom:24px}
-.section{background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:24px;margin-bottom:20px}
-h2{font-size:15px;color:#aaa;margin-bottom:16px}
-input[type=file],input[type=number]{background:#111;border:1px solid #333;border-radius:8px;color:#fff;padding:10px 12px;font-size:14px;width:100%;margin-bottom:10px}
-button{padding:10px 20px;background:#6c47ff;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer}
-button.sec{background:#333}
-button:disabled{opacity:.5;cursor:default}
-button:not(:disabled):hover{opacity:.85}
-.prog-wrap{margin:10px 0;display:none}
-.prog-bar-bg{background:#222;border-radius:6px;height:10px}
-.prog-bar{background:#6c47ff;height:10px;border-radius:6px;width:0%;transition:width .15s}
-.prog-info{display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:#888}
-.video-item{background:#111;border:1px solid #2a2a2a;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:6px}
-.video-item.sel{border-color:#6c47ff;background:#1a1240}
-label{font-size:13px;color:#aaa;display:block;margin-bottom:4px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;padding:8px 10px;color:#666;border-bottom:1px solid #222}
-td{padding:8px 10px;border-bottom:1px solid #1a1a1a}
-.copy-btn{padding:3px 8px;font-size:11px;background:#222;border-radius:6px;cursor:pointer;border:none;color:#fff}
-</style></head>
-<body>
-<h1>🎬 KINOHUB Admin</h1>
-
-<div class="section">
-  <h2>Видео байршуулах (Cloudflare R2)</h2>
-  <input type="file" id="vFile" accept="video/*"/>
-  <div class="prog-wrap" id="progWrap">
-    <div class="prog-bar-bg"><div class="prog-bar" id="progBar"></div></div>
-    <div class="prog-info">
-      <span id="progPct">0%</span>
-      <span id="progSpeed"></span>
-      <span id="progEta"></span>
-    </div>
-  </div>
-  <button onclick="uploadVideo()" id="uploadBtn">Байршуулах</button>
-  <div id="uploadMsg" style="margin-top:10px"></div>
-</div>
-
-<div class="section">
-  <h2>Линк үүсгэх</h2>
-  <div id="videoList"><p style="color:#555;font-size:13px">Байршуулсан видео энд харагдана</p></div>
-  <br>
-  <label>Хэдэн линк үүсгэх</label>
-  <input type="number" id="lCount" value="1" min="1" max="500" style="max-width:160px"/>
-  <button onclick="genLinks()">Линк үүсгэх</button>
-  <div id="genResult" style="margin-top:14px"></div>
-</div>
-
-<div class="section">
-  <h2>Бүх линк <button class="sec" onclick="loadLinks()" style="font-size:11px;padding:4px 10px;margin-left:10px">🔄 Шинэчлэх</button></h2>
-  <div id="linksTable"></div>
-</div>
-
-<script>
-const token = localStorage.getItem('token');
-if (!token) location.href = '/admin';
-const H = {'Content-Type':'application/json','x-admin-token':token};
-let selVideoId = null;
-const BASE = location.origin;
-
-async function uploadVideo() {
-  const file = document.getElementById('vFile').files[0];
-  if (!file) return alert('Видео сонгоно уу');
-
-  const btn = document.getElementById('uploadBtn');
-  btn.disabled = true;
-  document.getElementById('progWrap').style.display = 'block';
-  document.getElementById('progBar').style.width = '0%';
-  document.getElementById('progPct').textContent = '0%';
-  document.getElementById('progSpeed').textContent = '';
-  document.getElementById('progEta').textContent = '';
-  document.getElementById('uploadMsg').innerHTML = '<span style="color:#aaa;font-size:13px">R2 холболт тогтоож байна...</span>';
-
-  const startTime = Date.now();
-
+async function handlePaymentScreenshot(senderId) {
   try {
-    // 1. Presigned URL авна
-    const urlRes = await fetch('/admin/get-upload-url', {
-      method: 'POST', headers: H,
-      body: JSON.stringify({ filename: file.name })
+    const video = db.getLatestVideo();
+    if (!video) { await sendFbMessage(senderId, 'Одоогоор видео байхгүй байна.'); return; }
+    const linkId = nanoid(10);
+    db.saveLink(linkId, { id: linkId, videoId: video.id, createdAt: Date.now() });
+    const baseUrl = process.env.BASE_URL || 'https://video-link-app-production.up.railway.app';
+    const linkUrl = baseUrl + '/watch/' + linkId;
+    await sendFbMessage(senderId, 'Төлбөр хүлээн авлаа! Баярлалаа!\n\nТаны видео линк:\n' + linkUrl + '\n\n72 цагийн дотор үзнэ үү.\nЛинк зөвхөн таны төхөөрөмжид ажиллана.');
+  } catch (err) { await sendFbMessage(senderId, 'Алдаа гарлаа. Дахин оролдоно уу.'); }
+}
+
+async function sendFbMessage(recipientId, text) {
+  const pageToken = process.env.FB_PAGE_TOKEN;
+  if (!pageToken) return;
+  try {
+    const r = await fetch('https://graph.facebook.com/v19.0/me/messages?access_token=' + pageToken, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
     });
-    if (!urlRes.ok) throw new Error('URL авахад алдаа гарлаа');
-    const { uploadUrl, key } = await urlRes.json();
-
-    document.getElementById('uploadMsg').innerHTML = '<span style="color:#aaa;font-size:13px">Байршуулж байна...</span>';
-
-    // 2. Шууд R2-р уу PUT хийнэ (progress харагдана)
-    await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('PUT', uploadUrl);
-      xhr.setRequestHeader('Content-Type', 'video/mp4');
-
-      xhr.upload.onprogress = e => {
-        if (!e.lengthComputable) return;
-        const pct     = Math.round(e.loaded / e.total * 100);
-        const elapsed = (Date.now() - startTime) / 1000;
-        const speed   = e.loaded / elapsed; // bytes/sec
-        const eta     = (e.total - e.loaded) / speed;
-
-        document.getElementById('progBar').style.width   = pct + '%';
-        document.getElementById('progPct').textContent   = pct + '%';
-        document.getElementById('progSpeed').textContent = (speed / 1048576).toFixed(1) + ' MB/s';
-        document.getElementById('progEta').textContent   = eta > 0 ? Math.ceil(eta) + 'с үлдсэн' : '';
-      };
-
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) resolve();
-        else reject(new Error('R2 алдаа: ' + xhr.status));
-      };
-      xhr.onerror = () => reject(new Error('Сүлжээний алдаа'));
-      xhr.send(file);
-    });
-
-    // 3. Серверт бүртгэнэ
-    const reg = await fetch('/admin/register-video', {
-      method: 'POST', headers: H,
-      body: JSON.stringify({ key, filename: file.name })
-    }).then(r => r.json());
-
-    document.getElementById('progBar').style.width = '100%';
-    document.getElementById('progPct').textContent = '100%';
-    document.getElementById('progEta').textContent = '';
-    document.getElementById('uploadMsg').innerHTML = '<p style="color:#7fff7f;font-size:13px;margin-top:6px">✅ Байршлаа!</p>';
-    loadVideos();
-  } catch (err) {
-    document.getElementById('uploadMsg').innerHTML = '<p style="color:#ff5c5c;font-size:13px;margin-top:6px">❌ ' + err.message + '</p>';
-  } finally {
-    btn.disabled = false;
-  }
+    const data = await r.json();
+    if (data.error) console.error('FB send error:', JSON.stringify(data.error));
+  } catch (err) { console.error('sendFbMessage error:', err); }
 }
 
-async function loadVideos() {
-  const vs = await fetch('/admin/videos',{headers:H}).then(r=>r.json());
-  const el = document.getElementById('videoList');
-  if (!vs.length) { el.innerHTML='<p style="color:#555;font-size:13px">Байршуулсан видео байхгүй</p>'; return; }
-  el.innerHTML = vs.map(v=>'<div class="video-item '+(selVideoId===v.id?'sel':'')+'" onclick="sel(\\''+v.id+'\\',this)"><span style="font-size:13px">🎬 '+v.name+'</span></div>').join('');
-}
-function sel(id,el){selVideoId=id;document.querySelectorAll('.video-item').forEach(e=>e.classList.remove('sel'));el.classList.add('sel');}
-
-async function genLinks() {
-  if (!selVideoId) return alert('Видео сонгоно уу');
-  const count = parseInt(document.getElementById('lCount').value)||1;
-  const d = await fetch('/admin/generate-links',{method:'POST',headers:H,body:JSON.stringify({videoId:selVideoId,count})}).then(r=>r.json());
-  if (d.links) {
-    document.getElementById('genResult').innerHTML = '<p style="font-size:13px;color:#aaa;margin-bottom:10px">✅ '+d.links.length+' линк үүслээ:</p>'
-      +d.links.map((l,i)=>'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="color:#555;font-size:12px;width:24px">'+(i+1)+'.</span><code style="font-size:12px;background:#111;padding:4px 8px;border-radius:6px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+BASE+'/buy/'+l+'</code><button class="copy-btn" onclick="cp(\\''+BASE+'/buy/'+l+'\\',this)">📋</button></div>').join('')
-      +'<button class="sec" onclick="cpAll()" style="margin-top:8px;font-size:12px">Бүгдийг хуулах</button>';
-    window._lastLinks = d.links.map(l=>BASE+'/buy/'+l);
-    loadLinks();
-  }
-}
-
-function cp(t,btn){navigator.clipboard.writeText(t);btn.textContent='✓';setTimeout(()=>btn.textContent='📋',1500);}
-function cpAll(){navigator.clipboard.writeText((window._lastLinks||[]).join('\\n'));alert('Бүх линк хуулагдлаа!');}
-
-async function loadLinks() {
-  const links = await fetch('/admin/links',{headers:H}).then(r=>r.json());
-  const el = document.getElementById('linksTable');
-  if (!links.length) { el.innerHTML='<p style="color:#555;font-size:13px">Линк байхгүй</p>'; return; }
-  el.innerHTML = '<table><tr><th>Линк</th><th>Үүсгэсэн</th></tr>'
-    +links.map(l=>'<tr><td><code style="font-size:11px">/buy/'+l.id+'</code> <button class="copy-btn" onclick="cp(\\''+BASE+'/buy/'+l.id+'\\',this)">📋</button></td><td style="color:#666;font-size:12px">'+new Date(l.createdAt).toLocaleString('mn-MN')+'</td></tr>').join('')
-    +'</table>';
-}
-
-loadVideos();
-loadLinks();
-</script>
-</body></html>`;
-}
-
-function errorPage(title, msg) {
-  return `<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
-<style>body{font-family:system-ui,sans-serif;background:#0f0f0f;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:24px}.card{max-width:400px}h1{font-size:22px;margin-bottom:12px}.icon{font-size:48px;margin-bottom:16px}p{color:#888;font-size:15px}</style></head>
-<body><div class="card"><div class="icon">🔒</div><h1>${title}</h1><p>${msg}</p></div></body></html>`;
-}
-
-app.listen(PORT, () => {
-  console.log(`✅ Сервер: http://localhost:${PORT}`);
-  console.log(`📋 Admin: http://localhost:${PORT}/admin`);
-});
+app.listen(PORT, () => console.log('Server running on port ' + PORT));
