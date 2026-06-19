@@ -187,7 +187,11 @@ app.post('/webhook', async (req, res) => {
       if (!senderId || senderId === entry.id) continue;
       if (event.message) {
         const hasImage = (event.message.attachments || []).some(a => a.type === 'image');
-        if (hasImage) await handlePaymentScreenshot(senderId);
+        if (hasImage) {
+              const imgAtt = (event.message.attachments || []).find(a => a.type === 'image');
+              const imageUrl = imgAtt && imgAtt.payload && imgAtt.payload.url;
+              await handlePaymentScreenshot(senderId, imageUrl);
+            }
         else if (event.message.text) await sendBankInfo(senderId);
       }
     }
@@ -209,16 +213,57 @@ async function sendBankInfo(recipientId) {
   await sendFbMessage(recipientId, text);
 }
 
-async function handlePaymentScreenshot(senderId) {
+async function handlePaymentScreenshot(senderId, imageUrl) {
   try {
+    const profileRes = await fetch('https://graph.facebook.com/v19.0/' + senderId + '?fields=name&access_token=' + process.env.FB_PAGE_TOKEN);
+    const profile = await profileRes.json();
+    const fbName = (profile.name || '').toLowerCase().trim();
+
+    const imgRes = await fetch(imageUrl);
+    const imgBuffer = await imgRes.arrayBuffer();
+    const base64Img = Buffer.from(imgBuffer).toString('base64');
+    const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: contentType, data: base64Img } },
+          { type: 'text', text: 'Энэ банкны гүйлгээний screenshot. Дараах мэдээллийг гарга:\n1. Хүлээн авагчийн дансны дугаар (зөвхөн тоо)\n2. Гүйлгээний утга эсвэл тайлбар текст\n\nЗөвхөн JSON өгнө үү: {"account":"...","description":"..."}' }
+        ]}]
+      })
+    });
+    const claudeData = await claudeRes.json();
+    const rawText = (claudeData.content && claudeData.content[0] && claudeData.content[0].text) || '';
+    let parsed = {};
+    try { const m = rawText.match(/\{[\s\S]+?\}/); if (m) parsed = JSON.parse(m[0]); } catch(e) {}
+
+    const accountOk = parsed.account && parsed.account.replace(/\D/g, '').includes('5300692947');
+    const descLower = (parsed.description || '').toLowerCase();
+    const nameOk = fbName && fbName.split(' ').some(part => part.length > 1 && descLower.includes(part));
+
+    if (!accountOk) {
+      await sendFbMessage(senderId, '❌ Дансны дугаар таарсангүй.\n\nШилжүүлэх данс: 5300692947 (Хаан банк)\n\nЗөв дансанд шилжүүлээд screenshot дахин явуулна уу.');
+      return;
+    }
+    if (!nameOk) {
+      await sendFbMessage(senderId, '❌ Гүйлгээний утга дээр таны фэйсбүүк нэр ("' + profile.name + '") олдсонгүй.\n\nГүйлгээний утга дээр өөрийн фэйсбүүк нэрийг бичээд дахин явуулна уу.');
+      return;
+    }
+
     const video = db.getLatestVideo();
-    if (!video) { await sendFbMessage(senderId, 'Одоогоор видео байхгүй байна.'); return; }
+    if (!video) { await sendFbMessage(senderId, 'Одоогоор идэвхтэй видео байхгүй. Удахгүй нэмэгдэх болно!'); return; }
     const linkId = nanoid(10);
     db.saveLink(linkId, { id: linkId, videoId: video.id, createdAt: Date.now() });
-    const baseUrl = process.env.BASE_URL || 'https://video-link-app-production.up.railway.app';
-    const linkUrl = baseUrl + '/watch/' + linkId;
-    await sendFbMessage(senderId, 'Төлбөр хүлээн авлаа! Баярлалаа!\n\nТаны видео линк:\n' + linkUrl + '\n\n72 цагийн дотор үзнэ үү.\nЛинк зөвхөн таны төхөөрөмжид ажиллана.');
-  } catch (err) { await sendFbMessage(senderId, 'Алдаа гарлаа. Дахин оролдоно уу.'); }
+    const linkUrl = process.env.BASE_URL + '/watch/' + linkId;
+    await sendFbMessage(senderId, '✅ Төлбөр баталгаажлаа!\n\nТаны видео линк:\n' + linkUrl + '\n\n⏰ 72 цагийн дотор үзнэ үү.\n🔒 Линк зөвхөн таны төхөөрөмжид ажиллана.');
+  } catch(err) {
+    console.error('Screenshot error:', err);
+    await sendFbMessage(senderId, 'Скрийншот боловсруулахад алдаа гарлаа. Дахин явуулна уу.');
+  }
 }
 
 async function sendFbMessage(recipientId, text) {
