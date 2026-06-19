@@ -205,9 +205,7 @@ app.post('/webhook', async (req, res) => {
 });
 
 async function sendBankInfo(recipientId) {
-  const bankInfo = process.env.BANK_INFO || 'Хаан банк: 5000XXXX';
-  const price = process.env.VIDEO_PRICE || '5000';
-  const text = 'Сайн байна уу!\n\nКино үзэхийн тулд доорх дансанд мөнгө шилжүүлнэ үү:\n\n' + bankInfo + '\nҮнэ: ' + price + '\u20ae\n\nТөлбөр төлсний дараа гүйлгээний screenshot-г энд явуулна уу.\nАвтоматаар видео линк очих болно!';
+  const text = process.env.BANK_INFO || '"Аавын найз охин" киног үзэхийн хүсвэл хаан банкны 5300692947 дамбажав мөнхбаяр дансруу 5000 төгрөг шилжүүлнэ үү.';
   await sendFbMessage(recipientId, text);
 }
 
