@@ -243,8 +243,7 @@ async function handlePaymentScreenshot(senderId, imageUrl) {
     let parsed = {};
     try { const m = rawText.match(/\{[\s\S]+?\}/); if (m) parsed = JSON.parse(m[0]); } catch(e) {}
 
-    const rawDigits = rawText.replace(/\D/g, '');
-    const accountOk = rawDigits.includes('5300692947');
+    const accountOk = rawText.replace(/[^0-9]/g, '').indexOf('5300692947') !== -1;
     const descLower = (parsed.description || '').toLowerCase();
     const nameOk = fbName && fbName.split(' ').some(part => part.length > 1 && descLower.includes(part));
 
