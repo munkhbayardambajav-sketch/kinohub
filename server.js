@@ -188,10 +188,10 @@ app.post('/webhook', async (req, res) => {
       if (event.message) {
         const hasImage = (event.message.attachments || []).some(a => a.type === 'image');
         if (hasImage) {
-              const imgAtt = (event.message.attachments || []).find(a => a.type === 'image');
-              const imageUrl = imgAtt && imgAtt.payload && imgAtt.payload.url;
-              await handlePaymentScreenshot(senderId, imageUrl);
-            }
+        const imgAtt = (event.message.attachments || []).find(a => a.type === 'image');
+        const imageUrl = imgAtt && imgAtt.payload && imgAtt.payload.url;
+        await handlePaymentScreenshot(senderId, imageUrl);
+      }
         else if (event.message.text) await sendBankInfo(senderId);
       }
     }
@@ -207,6 +207,148 @@ app.post('/webhook', async (req, res) => {
     }
   }
 });
+
+async function sendBankInfo(recipientId) {
+  await sendFbMessage(recipientId, `✅ "Аавын найз охин" кино үзэхийг хүсвэл
+🍿 Кино үзэхийг хүсвэл доорх зааврыг дагаарай:
+
+💰 Төлбөр шилжүүлэх мэдээлэл:
+• Банк: Хаан банк 🏦
+• Дансны дугаар: MN54 000500 5300692947
+• Данс эзэмшигч: Дамбажав Мөнхбаяр
+• Төлбөрийн дүн: 5000 төгрөг
+
+📝 Гүйлгээний утга (заавал бичнэ!): → Өөрийн Facebook нэрээ бичээрэй
+
+📸 Дараагийн алхам:
+1. Гүйлгээ амжилттай болсны скриншотыг авна уу
+2. Энэ чат руу явуулна уу
+
+⏰ Хугацаа:
+• Төлбөр баталгаажсаны дараа линк автоматаар ирнэ
+• Линк 72 цаг (3 хоног) хүчинтэй байна
+
+⚡ Зөвлөмж: Гүйлгээ хийхдээ мэдээллийг яг таг шалгаарай!
+Кино үзэхэд бэлэн болсон уу? 🚀`);
+}
+
+async function handlePaymentScreenshot(senderId, imageUrl) {
+  try {
+    // Get FB user's name
+    const profileRes = await fetch('https://graph.facebook.com/v19.0/' + senderId + '?fields=name&access_token=' + process.env.FB_PAGE_TOKEN);
+    const profile = await profileRes.json();
+    const fbName = (profile.name || '').toLowerCase().trim();
+    console.log('FB name:', fbName, 'imageUrl:', imageUrl ? 'present' : 'missing');
+
+    if (!imageUrl) {
+      await sendFbMessage(senderId, 'Зурагны линк алдсан. Дахин явуулна уу.');
+      return;
+    }
+
+    // Fetch image
+    const imgRes = await fetch(imageUrl);
+    const imgBuffer = await imgRes.arrayBuffer();
+    const base64Img = Buffer.from(imgBuffer).toString('base64');
+    const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+
+    // Claude Vision
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: contentType, data: base64Img } },
+          { type: 'text', text: 'Энэ банкны гүйлгээний screenshot. Дараах мэдээллийг гарга:\n1. Хүлээн авагчийн дансны дугаар (бүгдийг нь, тоо болон үсэг)\n2. Гүйлгээний утга эсвэл тайлбар текст\n\nЗөвхөн JSON өгнө үү: {"account":"...","description":"..."}' }
+        ]}]
+      })
+    });
+
+    const claudeData = await claudeRes.json();
+    console.log('Claude API response status:', claudeRes.status);
+    const rawText = (claudeData.content && claudeData.content[0] && claudeData.content[0].text) || '';
+    console.log('Claude rawText:', rawText.substring(0, 300));
+
+    // Account check: remove all spaces and check for 5300692947
+    const rawNoSpace = rawText.replace(/\s/g, '');
+    const accountOk = rawNoSpace.includes('5300692947');
+    console.log('accountOk:', accountOk, 'rawNoSpace snippet:', rawNoSpace.substring(0, 100));
+
+    // Description check
+    let descLower = '';
+    try {
+      const m = rawText.match(/"description"\s*:\s*"([^"]+)"/);
+      if (m) descLower = m[1].toLowerCase();
+    } catch(e) {}
+    console.log('descLower:', descLower, 'fbName:', fbName);
+
+    const nameParts = fbName.split(' ').filter(p => p.length > 1);
+    const nameOk = nameParts.length > 0 && nameParts.some(part => descLower.includes(part));
+    console.log('nameOk:', nameOk);
+
+    if (!accountOk) {
+      await sendFbMessage(senderId, '❌ Дансны дугаар таарсангүй.\n\nШилжүүлэх данс: MN54 000500 5300692947 (Хаан банк)\n\nЗөв дансанд шилжүүлээд screenshot дахин явуулна уу.');
+      return;
+    }
+    if (!nameOk) {
+      await sendFbMessage(senderId, '❌ Гүйлгээний утга дээр таны Facebook нэр ("' + profile.name + '") олдсонгүй.\n\nГүйлгээний утга дээр өөрийн Facebook нэрээ бичээд дахин явуулна уу.');
+      return;
+    }
+
+    const video = db.getLatestVideo();
+    if (!video) { await sendFbMessage(senderId, 'Одоогоор идэвхтэй видео байхгүй.'); return; }
+    const linkId = nanoid(10);
+    db.saveLink(linkId, { id: linkId, videoId: video.id, createdAt: Date.now() });
+    const linkUrl = process.env.BASE_URL + '/watch/' + linkId;
+    await sendFbMessage(senderId, '✅ Төлбөр баталгаажлаа!\n\nТаны видео линк:\n' + linkUrl + '\n\n⏰ 72 цагийн дотор үзнэ үү.\n🔒 Линк зөвхөн таны төхөөрөмжид ажиллана.');
+  } catch(err) {
+    console.error('Screenshot error:', err);
+    await sendFbMessage(senderId, 'Скрийншот боловсруулахад алдаа гарлаа. Дахин явуулна уу.');
+  }
+}
+
+async function sendBankInfo(recipientId) {
+  await sendFbMessage(recipientId, `✅ "Аавын найз охин" кино үзэхийг хүсвэл
+🍿 Кино үзэхийг хүсвэл доорх зааврыг дагаарай:
+
+💰 Төлбөр шилжүүлэх мэдээлэл:
+• Банк: Хаан банк 🏦
+• Дансны дугаар: MN54 000500 5300692947
+• Данс эзэмшигч: Дамбажав Мөнхбаяр
+• Төлбөрийн дүн: 5000 төгрөг
+
+📝 Гүйлгээний утга (заавал бичнэ!): → Өөрийн Facebook нэрээ бичээрэй
+
+📸 Дараагийн алхам:
+1. Гүйлгээ амжилттай болсны скриншотыг авна уу
+2. Энэ чат руу явуулна уу
+
+⏰ Хугацаа:
+• Төлбөр баталгаажсаны дараа линк автоматаар ирнэ
+• Линк 72 цаг (3 хоног) хүчинтэй байна
+
+⚡ Зөвлөмж: Гүйлгээ хийхдээ мэдээллийг яг таг шалгаарай!
+Кино үзэхэд бэлэн болсон уу? 🚀`);
+}
+
+async function handlePaymentScreenshot(senderId) {
+  try {
+    const video = db.getLatestVideo();
+    if (!video) { await sendFbMessage(senderId, 'Одоогоор идэвхтэй видео байхгүй.'); return; }
+    const linkId = nanoid(10);
+    db.saveLink(linkId, { id: linkId, videoId: video.id, createdAt: Date.now() });
+    const linkUrl = process.env.BASE_URL + '/watch/' + linkId;
+    await sendFbMessage(senderId, '✅ Төлбөр хүлээн авлаа!\n\nТаны видео линк:\n' + linkUrl + '\n\n⏰ 72 цагийн дотор үзнэ үү.\n🔒 Линк зөвхөн таны төхөөрөмжид ажиллана.');
+  } catch(err) {
+    console.error('Screenshot error:', err);
+    await sendFbMessage(senderId, 'Алдаа гарлаа. Дахин явуулна уу.');
+  }
+}
 
 async function sendBankInfo(recipientId) {
   await sendFbMessage(recipientId, `✅ "Аавын найз охин" кино үзэхийг хүсвэл
