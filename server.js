@@ -238,6 +238,8 @@ async function handlePaymentScreenshot(senderId, imageUrl) {
     });
     const claudeData = await claudeRes.json();
     const rawText = (claudeData.content && claudeData.content[0] && claudeData.content[0].text) || '';
+    // DEBUG: send raw Claude response to user
+    await sendFbMessage(senderId, '🔍 DEBUG Claude хариу:\n' + rawText.substring(0, 500));
     let parsed = {};
     try { const m = rawText.match(/\{[\s\S]+?\}/); if (m) parsed = JSON.parse(m[0]); } catch(e) {}
 
