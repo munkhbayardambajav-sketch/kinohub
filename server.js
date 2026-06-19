@@ -257,15 +257,20 @@ async function handlePaymentScreenshot(senderId, imageUrl) {
     });
     const claudeData = await claudeRes.json();
     const rawText = (claudeData.content && claudeData.content[0] && claudeData.content[0].text) || '';
-    let parsed = {};
-    try { const m = rawText.match(/\{[\s\S]+?\}/); if (m) parsed = JSON.parse(m[0]); } catch(e) {}
 
-    const accountOk = rawText.replace(/[^0-9]/g, '').indexOf('5300692947') !== -1;
-    const descLower = (parsed.description || '').toLowerCase();
+    // Check account: look for 5300692947 anywhere in rawText (handles IBAN MN54000500 5300692947)
+    const accountOk = rawText.includes('5300692947');
+
+    // Check name: sender's FB name appears in description
+    let descLower = '';
+    try {
+      const m = rawText.match(/description["\s]*:["\s]*"([^"]+)"/);
+      if (m) descLower = m[1].toLowerCase();
+    } catch(e) {}
     const nameOk = fbName && fbName.split(' ').some(part => part.length > 1 && descLower.includes(part));
 
     if (!accountOk) {
-      await sendFbMessage(senderId, '❌ Дансны дугаар таарсангүй.\n\nШилжүүлэх данс: 5300692947 (Хаан банк)\n\nЗөв дансанд шилжүүлээд screenshot дахин явуулна уу.');
+      await sendFbMessage(senderId, '❌ Дансны дугаар таарсангүй.\n\nШилжүүлэх данс: MN54 000500 5300692947 (Хаан банк)\n\nЗөв дансанд шилжүүлээд screenshot дахин явуулна уу.');
       return;
     }
     if (!nameOk) {
@@ -274,7 +279,7 @@ async function handlePaymentScreenshot(senderId, imageUrl) {
     }
 
     const video = db.getLatestVideo();
-    if (!video) { await sendFbMessage(senderId, 'Одоогоор идэвхтэй видео байхгүй. Удахгүй нэмэгдэх болно!'); return; }
+    if (!video) { await sendFbMessage(senderId, 'Одоогоор идэвхтэй видео байхгүй.'); return; }
     const linkId = nanoid(10);
     db.saveLink(linkId, { id: linkId, videoId: video.id, createdAt: Date.now() });
     const linkUrl = process.env.BASE_URL + '/watch/' + linkId;
