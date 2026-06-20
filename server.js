@@ -193,7 +193,6 @@ app.post('/admin/create-link', requireAdmin, async (req, res) => {
 app.get('/admin/videos', requireAdmin, async (req, res) => res.json(await db.getAllVideos()));
 app.get('/admin/links', requireAdmin, async (req, res) => res.json(await db.getAllLinks()));
 
-// Watch: one link = one person = one device
 app.get('/watch/:linkId', async (req, res) => {
   try {
     const { linkId } = req.params;
@@ -205,25 +204,14 @@ app.get('/watch/:linkId', async (req, res) => {
     if (age > 72 * 60 * 60 * 1000) {
       return res.status(410).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:Arial"><h2>\u23f0 \u041b\u0438\u043d\u043a\u0438\u0439\u043d \u0445\u0443\u0433\u0430\u0446\u0430\u0430 \u0434\u0443\u0443\u0441\u0441\u0430\u043d</h2><p style="color:#9ca3af;margin-top:12px">72 \u0446\u0430\u0433\u0438\u0439\u043d \u0445\u0443\u0433\u0430\u0446\u0430\u0430 \u04e9\u043d\u0433\u04e9\u0440\u0441\u04e9\u043d \u0431\u0430\u0439\u043d\u0430</p></body></html>');
     }
-    const cookies = parseCookies(req);
-    const cookieToken = cookies['v_' + linkId];
-
-    if (!link.activatedAt) {
-      // \u0410\u043d\u0445 \u043d\u044d\u044d\u0436 \u0431\u0430\u0439\u043d\u0430 \u2014 device \u0431\u04af\u0440\u0442\u0433\u044d\u0436 activate \u0445\u0438\u0439\u043d\u044d
-      const deviceToken = crypto.randomBytes(24).toString('hex');
-      await db.updateLink(linkId, { activatedAt: Date.now(), deviceToken });
-      res.setHeader('Set-Cookie', 'v_' + linkId + '=' + deviceToken + '; HttpOnly; Path=/; Max-Age=259200');
-      return res.send(playerPage(linkId));
+    const video = await db.getVideo(link.videoId);
+    if (!video) {
+      return res.status(404).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:Arial"><h2>\u0412\u0438\u0434\u0435\u043e \u043e\u043b\u0434\u0441\u043e\u043d\u0433\u04af\u0439</h2></body></html>');
     }
-
-    // \u04e8\u043c\u043d\u04e9 activate \u0445\u0438\u0439\u0433\u0434\u0441\u044d\u043d \u2014 cookie \u0448\u0430\u043b\u0433\u0430\u043d\u0430
-    if (cookieToken === link.deviceToken) {
-      // \u0417\u04e9\u0432 \u0442\u04e9\u0445\u04e9\u04e9\u0440\u04e9\u043c\u0436
-      return res.send(playerPage(linkId));
-    }
-
-    // \u04e8\u04e9\u0440 \u0442\u04e9\u0445\u04e9\u04e9\u0440\u04e9\u043c\u0436 \u2014 \u0445\u0430\u043d\u0434\u0430\u0445 \u044d\u0440\u0445\u0433\u04af\u0439
-    return res.status(403).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:Arial"><h2>\ud83d\udd12 \u042d\u043d\u044d \u043b\u0438\u043d\u043a \u0430\u0448\u0438\u0433\u043b\u0430\u0433\u0434\u0441\u0430\u043d \u0431\u0430\u0439\u043d\u0430</h2><p style="color:#9ca3af;margin-top:12px">\u041b\u0438\u043d\u043a \u0437\u04e9\u0432\u0445\u04e9\u043d \u043d\u044d\u0433 \u0442\u04e9\u0445\u04e9\u04e9\u0440\u04e9\u043c\u0436\u0438\u0434 \u0445\u04af\u0447\u0438\u043d\u0442\u044d\u0439</p></body></html>');
+    const command = new GetObjectCommand({ Bucket: BUCKET, Key: video.key || video.filename });
+    const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    const html = '<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>\u0412\u0438\u0434\u0435\u043e</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh}video{max-width:100%;width:100%}</style></head><body><video controls autoplay controlsList="nodownload" oncontextmenu="return false"><source src="' + signedUrl + '" type="video/mp4"></video></body></html>';
+    res.send(html);
   } catch (err) {
     console.error('Watch error:', err);
     res.status(500).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:Arial"><h2>\u0410\u043b\u0434\u0430\u0430 \u0433\u0430\u0440\u043b\u0430\u0430</h2><p>' + (err.message || '') + '</p></body></html>');
