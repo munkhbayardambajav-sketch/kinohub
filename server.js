@@ -258,12 +258,12 @@ app.post('/webhook', async (req, res) => {
       const senderId = event.sender && event.sender.id;
       if (!senderId || senderId === entry.id) continue;
       if (event.message) {
-        const hasImage = (event.message.attachments || []).some(a => a.type === 'image');
-        if (hasImage) {
-          const imgAtt = (event.message.attachments || []).find(a => a.type === 'image');
+        const isRealImage = (event.message.attachments || []).some(a => a.type === 'image' && !(a.payload && a.payload.sticker_id));
+        if (isRealImage) {
+          const imgAtt = (event.message.attachments || []).find(a => a.type === 'image' && !(a.payload && a.payload.sticker_id));
           const imageUrl = imgAtt && imgAtt.payload && imgAtt.payload.url;
           await handlePaymentScreenshot(senderId, imageUrl);
-        } else if (event.message.text) {
+        } else if (event.message.text && !event.message.is_echo) {
           await sendBankInfo(senderId);
         }
       }
