@@ -150,10 +150,10 @@ app.get('/admin/dashboard', requireAdmin, async (req, res) => {
   const videos = await db.getAllVideos();
   const links = await db.getAllLinks();
   const latestVideo = videos.length ? videos[videos.length - 1] : null;
-  const activeCount = links.filter(l => l.activatedAt && Date.now() - l.activatedAt < 72*3600*1000).length;
+  const activeCount = links.filter(l => l.activatedAt && Date.now() - l.activatedAt < 24*3600*1000).length;
   const unusedCount = links.filter(l => !l.activatedAt).length;
   const rows = links.slice(-20).reverse().map(l => {
-    const a = l.activatedAt && Date.now() - l.activatedAt < 72*3600*1000;
+    const a = l.activatedAt && Date.now() - l.activatedAt < 24*3600*1000;
     const u = !l.activatedAt;
     const badge = u ? '<span style="background:#451a03;color:#fcd34d;padding:2px 8px;border-radius:4px;font-size:12px">\u0410\u0448\u0438\u0433\u043b\u0430\u0430\u0433\u04af\u0439</span>' : a ? '<span style="background:#064e3b;color:#6ee7b7;padding:2px 8px;border-radius:4px;font-size:12px">\u0418\u0434\u044d\u0432\u0445\u0442\u044d\u0439</span>' : '<span style="background:#450a0a;color:#fca5a5;padding:2px 8px;border-radius:4px;font-size:12px">\u0414\u0443\u0443\u0441\u0441\u0430\u043d</span>';
     return '<tr><td><a href="/watch/' + l.id + '" target="_blank" style="color:#a5b4fc">' + l.id + '</a></td><td>' + new Date(l.createdAt).toLocaleString('mn-MN') + '</td><td>' + badge + '</td><td>' + (l.activatedAt ? new Date(l.activatedAt).toLocaleString('mn-MN') : '-') + '</td></tr>';
@@ -201,8 +201,8 @@ app.get('/watch/:linkId', async (req, res) => {
       return res.status(404).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:Arial"><h2>\u041b\u0438\u043d\u043a \u043e\u043b\u0434\u0441\u043e\u043d\u0433\u04af\u0439</h2></body></html>');
     }
     const age = Date.now() - link.createdAt;
-    if (age > 72 * 60 * 60 * 1000) {
-      return res.status(410).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:Arial"><h2>\u23f0 \u041b\u0438\u043d\u043a\u0438\u0439\u043d \u0445\u0443\u0433\u0430\u0446\u0430\u0430 \u0434\u0443\u0443\u0441\u0441\u0430\u043d</h2><p style="color:#9ca3af;margin-top:12px">72 \u0446\u0430\u0433\u0438\u0439\u043d \u0445\u0443\u0433\u0430\u0446\u0430\u0430 \u04e9\u043d\u0433\u04e9\u0440\u0441\u04e9\u043d \u0431\u0430\u0439\u043d\u0430</p></body></html>');
+    if (age > 24 * 60 * 60 * 1000) {
+      return res.status(410).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:Arial"><h2>\u23f0 \u041b\u0438\u043d\u043a\u0438\u0439\u043d \u0445\u0443\u0433\u0430\u0446\u0430\u0430 \u0434\u0443\u0443\u0441\u0441\u0430\u043d</h2><p style="color:#9ca3af;margin-top:12px">24 \u0446\u0430\u0433\u0438\u0439\u043d \u0445\u0443\u0433\u0430\u0446\u0430\u0430 \u04e9\u043d\u0433\u04e9\u0440\u0441\u04e9\u043d \u0431\u0430\u0439\u043d\u0430</p></body></html>');
     }
     const video = await db.getVideo(link.videoId);
     if (!video) {
@@ -303,7 +303,7 @@ async function sendBankInfo(recipientId) {
 
 \u23f0 \u0425\u0443\u0433\u0430\u0446\u0430\u0430:
 \u2022 \u0422\u04e9\u043b\u0431\u04e9\u0440 \u0431\u0430\u0442\u0430\u043b\u0433\u0430\u0430\u0436\u0441\u0430\u043d\u044b \u0434\u0430\u0440\u0430\u0430 \u043b\u0438\u043d\u043a \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0430\u0430\u0440 \u0438\u0440\u043d\u044d
-\u2022 \u041b\u0438\u043d\u043a 72 \u0446\u0430\u0433 (3 \u0445\u043e\u043d\u043e\u0433) \u0445\u04af\u0447\u0438\u043d\u0442\u044d\u0439 \u0431\u0430\u0439\u043d\u0430
+\u2022 \u041b\u0438\u043d\u043a 24 \u0446\u0430\u0433 \u0445\u04af\u0447\u0438\u043d\u0442\u044d\u0439 \u0431\u0430\u0439\u043d\u0430
 
 \u26a1 \u0417\u04e9\u0432\u043b\u04e9\u043c\u0436: \u0413\u04af\u0439\u043b\u0433\u044d\u044d \u0445\u0438\u0439\u0445\u0434\u044d\u044d \u043c\u044d\u0434\u044d\u044d\u043b\u043b\u0438\u0439\u0433 \u044f\u0433 \u0442\u0430\u0433 \u0448\u0430\u043b\u0433\u0430\u0430\u0440\u0430\u0439!
 \u041a\u0438\u043d\u043e \u04af\u0437\u044d\u0445\u044d\u0434 \u0431\u044d\u043b\u044d\u043d \u0431\u043e\u043b\u0441\u043e\u043d \u0443\u0443? \u1f680`);
@@ -356,7 +356,7 @@ async function handlePaymentScreenshot(senderId, imageUrl) {
     const linkId = nanoid(10);
     await db.saveLink(linkId, { id: linkId, videoId: video.id, createdAt: Date.now() });
     const linkUrl = process.env.BASE_URL + '/watch/' + linkId;
-    await sendFbMessage(senderId, '\u2705 \u0422\u04e9\u043b\u0431\u04e9\u0440 \u0431\u0430\u0442\u0430\u043b\u0433\u0430\u0430\u0436\u043b\u0430\u0430!\n\n\u0422\u0430\u043d\u044b \u0432\u0438\u0434\u0435\u043e \u043b\u0438\u043d\u043a:\n' + linkUrl + '\n\n\u23f0 72 \u0446\u0430\u0433\u0438\u0439\u043d \u0434\u043e\u0442\u043e\u0440 \u04af\u0437\u043d\u044d \u04af\u04af.\n\u1f512 \u041b\u0438\u043d\u043a \u0437\u04e9\u0432\u0445\u04e9\u043d \u0442\u0430\u043d\u044b \u0442\u04e9\u0445\u04e9\u04e9\u0440\u04e9\u043c\u0436\u0438\u0434 \u0430\u0436\u0438\u043b\u043b\u0430\u043d\u0430.');
+    await sendFbMessage(senderId, '\u2705 \u0422\u04e9\u043b\u0431\u04e9\u0440 \u0431\u0430\u0442\u0430\u043b\u0433\u0430\u0430\u0436\u043b\u0430\u0430!\n\n\u0422\u0430\u043d\u044b \u0432\u0438\u0434\u0435\u043e \u043b\u0438\u043d\u043a:\n' + linkUrl + '\n\n\u23f0 24 \u0446\u0430\u0433\u0438\u0439\u043d \u0434\u043e\u0442\u043e\u0440 \u04af\u0437\u043d\u044d \u04af\u04af.\n\u1f512 \u041b\u0438\u043d\u043a \u0437\u04e9\u0432\u0445\u04e9\u043d \u0442\u0430\u043d\u044b \u0442\u04e9\u0445\u04e9\u04e9\u0440\u04e9\u043c\u0436\u0438\u0434 \u0430\u0436\u0438\u043b\u043b\u0430\u043d\u0430.');
   } catch(err) {
     console.error('Screenshot error:', err);
     await sendFbMessage(senderId, '\u0421\u043a\u0440\u0438\u0439\u043d\u0448\u043e\u0442 \u0431\u043e\u043b\u043e\u0432\u0441\u0440\u0443\u0443\u043b\u0430\u0445\u0430\u0434 \u0430\u043b\u0434\u0430\u0430 \u0433\u0430\u0440\u043b\u0430\u0430. \u0414\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.');
@@ -388,7 +388,7 @@ async function sendPrivateReply(commentId) {
 • Төлбөрийн дүн: 5000 төгрөг
 
 📸 Гүйлгээний screenshot-г энэ чатруу явуулна уу — линк автоматаар ирнэ!
-⏰ Линк 72 цаг (3 хоног) хүчинтэй байна.`;
+⏰ Линк 24 цаг хүчинтэй байна.`;
   try {
     const r = await fetch('https://graph.facebook.com/v19.0/' + commentId + '/private_replies?access_token=' + pageToken, {
       method: 'POST',
