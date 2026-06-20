@@ -266,10 +266,10 @@ app.post('/webhook', async (req, res) => {
     for (const change of (entry.changes || [])) {
       if (change.field === 'feed' && change.value && change.value.item === 'comment') {
         const comment = (change.value.message || '').trim();
-        const commenterId = change.value.from && change.value.from.id;
-        if (!commenterId) continue;
+        const commentId = change.value.comment_id;
+        if (!commentId) continue;
         if (comment === '1' || /\u0430\u0432\u043d\u0430|\u04af\u0437\u043d\u044d|\u0430\u0432\u043c\u0430\u0430\u0440/i.test(comment)) {
-          await sendBankInfo(commenterId);
+          await sendPrivateReply(commentId);
         }
       }
     }
@@ -365,6 +365,30 @@ async function sendFbMessage(recipientId, text) {
     const data = await r.json();
     if (data.error) console.error('FB send error:', JSON.stringify(data.error));
   } catch (err) { console.error('sendFbMessage error:', err); }
+}
+
+async function sendPrivateReply(commentId) {
+  const pageToken = process.env.FB_PAGE_TOKEN;
+  if (!pageToken) return;
+  const message = `✅ "Аавын найз охин" кино үзэхийг хүсвэл дараах мэдээллээр төлбөр төлнө үү:
+
+💰 Төлбөр шилжүүлэх мэдээлэл:
+• Банк: Хаан банк 🏦
+• Дансны дугаар: MN54 000500 5300692947
+• Төлбөрийн дүн: 5000 төгрөг
+
+📸 Гүйлгээний screenshot-г энэ чатруу явуулна уу — линк автоматаар ирнэ!
+⏰ Линк 72 цаг (3 хоног) хүчинтэй байна.`;
+  try {
+    const r = await fetch('https://graph.facebook.com/v19.0/' + commentId + '/private_replies?access_token=' + pageToken, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+    const data = await r.json();
+    if (data.error) console.error('Private reply error:', JSON.stringify(data.error));
+    else console.log('Private reply sent to comment:', commentId);
+  } catch (err) { console.error('sendPrivateReply error:', err); }
 }
 
 initDb().then(() => {
