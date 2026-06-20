@@ -126,7 +126,7 @@ app.get('/admin', async (req, res) => {
   const cookies = parseCookies(req);
   const session = await db.getAdminSession();
   if (session && cookies.admin_session === session) return res.redirect('/admin/dashboard');
-  res.send('<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><title>Admin</title><style>body{font-family:Arial,sans-serif;background:#0f0f0f;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}.box{background:#1a1a1a;padding:40px;border-radius:12px;width:320px}h2{margin:0 0 24px;text-align:center}input{width:100%;padding:12px;margin-bottom:16px;border:1px solid #333;background:#111;color:#fff;border-radius:8px;box-sizing:border-box;font-size:14px}button{width:100%;padding:12px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer}</style></head><body><div class="box"><h2>Admin</h2><form method="POST" action="/admin/login"><input type="text" name="username" placeholder="ÐÑÐ²ÑÑÑÑ Ð½ÑÑ" required><input type="password" name="password" placeholder="ÐÑÑÑ Ò¯Ð³" required><button type="submit">ÐÑÐ²ÑÑÑÑ</button></form></div></body></html>');
+  res.send('<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><title>Admin</title><style>body{font-family:Arial,sans-serif;background:#0f0f0f;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}.box{background:#1a1a1a;padding:40px;border-radius:12px;width:320px}h2{margin:0 0 24px;text-align:center}input{width:100%;padding:12px;margin-bottom:16px;border:1px solid #333;background:#111;color:#fff;border-radius:8px;box-sizing:border-box;font-size:14px}button{width:100%;padding:12px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer}</style></head><body><div class="box"><h2>Admin</h2><form method="POST" action="/admin/login"><input type="text" name="username" placeholder="\u041d\u044d\u0432\u0442\u0440\u044d\u0445 \u043d\u044e\u0440" required><input type="password" name="password" placeholder="\u041d\u0443\u0443\u0446 \u04af\u0433" required><button type="submit">\u041d\u044d\u0432\u0442\u0440\u044d\u0445</button></form></div></body></html>');
 });
 
 app.post('/admin/login', async (req, res) => {
@@ -137,7 +137,7 @@ app.post('/admin/login', async (req, res) => {
     res.setHeader('Set-Cookie', 'admin_session=' + token + '; HttpOnly; Path=/; Max-Age=86400');
     return res.redirect('/admin/dashboard');
   }
-  res.send('<script>alert("ÐÑÐ²ÑÑÑÑ Ð½ÑÑ ÑÑÐ²ÑÐ» Ð½ÑÑÑ Ò¯Ð³ Ð±ÑÑÑÑ"); history.back();<\/script>');
+  res.send('<script>alert("\u041d\u044e\u0432\u0442\u0440\u044d\u0445 \u043d\u044d\u0440 \u044d\u0441\u0432\u044d\u043b \u043d\u0443\u0443\u0446 \u04af\u0433 \u0431\u0443\u0440\u0443\u0443"); history.back();<\/script>');
 });
 
 app.get('/admin/dashboard', requireAdmin, async (req, res) => {
@@ -149,10 +149,10 @@ app.get('/admin/dashboard', requireAdmin, async (req, res) => {
   const rows = links.slice(-20).reverse().map(l => {
     const a = l.activatedAt && Date.now() - l.activatedAt < 72*3600*1000;
     const u = !l.activatedAt;
-    const badge = u ? '<span style="background:#451a03;color:#fcd34d;padding:2px 8px;border-radius:4px;font-size:12px">ÐÑÐ¸Ð³Ð»Ð°Ð°Ð³Ò¯Ð¹</span>' : a ? '<span style="background:#064e3b;color:#6ee7b7;padding:2px 8px;border-radius:4px;font-size:12px">ÐÐ´ÑÐ²ÑÑÑÐ¹</span>' : '<span style="background:#450a0a;color:#fca5a5;padding:2px 8px;border-radius:4px;font-size:12px">ÐÑÑÑÑÐ°Ð½</span>';
+    const badge = u ? '<span style="background:#451a03;color:#fcd34d;padding:2px 8px;border-radius:4px;font-size:12px">\u0410\u0448\u0438\u0433\u043b\u0430\u0430\u0433\u04af\u0439</span>' : a ? '<span style="background:#064e3b;color:#6ee7b7;padding:2px 8px;border-radius:4px;font-size:12px">\u0418\u0434\u044d\u0432\u0445\u0442\u044d\u0439</span>' : '<span style="background:#450a0a;color:#fca5a5;padding:2px 8px;border-radius:4px;font-size:12px">\u0414\u0443\u0443\u0441\u0441\u0430\u043d</span>';
     return '<tr><td><a href="/watch/' + l.id + '" target="_blank" style="color:#a5b4fc">' + l.id + '</a></td><td>' + new Date(l.createdAt).toLocaleString('mn-MN') + '</td><td>' + badge + '</td><td>' + (l.activatedAt ? new Date(l.activatedAt).toLocaleString('mn-MN') : '-') + '</td></tr>';
   }).join('');
-  res.send('<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin Dashboard</title><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;background:#0f0f0f;color:#fff;margin:0;padding:20px}h1{color:#6366f1;margin-bottom:24px}.card{background:#1a1a1a;border-radius:12px;padding:24px;margin-bottom:20px}.card h2{margin:0 0 16px;font-size:18px;color:#a5b4fc}.btn{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:14px;margin:4px}.btn-primary{background:#6366f1;color:#fff}.btn-primary:hover{background:#4f46e5}input[type=file]{width:100%;padding:10px;background:#111;border:1px solid #333;color:#fff;border-radius:8px;font-size:14px;margin-bottom:12px}.stat{display:inline-block;background:#111;padding:12px 20px;border-radius:8px;margin:4px;text-align:center}.stat-num{font-size:28px;font-weight:bold;color:#6366f1}.stat-label{font-size:12px;color:#9ca3af}#progress-bar{width:0%;height:8px;background:#6366f1;border-radius:4px;transition:width 0.3s}#progress-wrap{background:#222;border-radius:4px;margin-top:8px;display:none}#status-msg{margin-top:8px;font-size:14px;color:#9ca3af}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #222}th{color:#9ca3af;font-weight:normal}</style></head><body><h1>Admin Dashboard</h1><div class="card"><h2>Ð¡ÑÐ°ÑÐ¸ÑÑÐ¸Ðº</h2><div class="stat"><div class="stat-num">' + videos.length + '</div><div class="stat-label">ÐÐ¸Ð¹Ñ Ð²Ð¸Ð´ÐµÐ¾</div></div><div class="stat"><div class="stat-num">' + links.length + '</div><div class="stat-label">ÐÐ¸Ð¹Ñ Ð»Ð¸Ð½Ðº</div></div><div class="stat"><div class="stat-num">' + activeCount + '</div><div class="stat-label">ÐÐ´ÑÐ²ÑÑÑÐ¹</div></div><div class="stat"><div class="stat-num">' + unusedCount + '</div><div class="stat-label">ÐÑÐ¸Ð³Ð»Ð°Ð°Ð³Ò¯Ð¹</div></div></div><div class="card"><h2>ÐÐ¸Ð´ÐµÐ¾ Ð¾ÑÑÑÐ»Ð°Ñ</h2>' + (latestVideo ? '<p style="color:#6ee7b7;font-size:14px;margin-bottom:12px">ÐÐ´Ð¾Ð¾Ð³Ð¸Ð¹Ð½ Ð²Ð¸Ð´ÐµÐ¾: <strong>' + (latestVideo.filename||latestVideo.id) + '</strong></p>' : '') + '<input type="file" id="video-file" accept="video/*"><div id="progress-wrap"><div id="progress-bar"></div></div><div id="status-msg"></div><button class="btn btn-primary" onclick="uploadVideo()" style="margin-top:8px">ÐÐ°Ð¹ÑÑÑÑÐ»Ð°Ñ</button></div><div class="card"><h2>ÐÐ¸Ð½Ðº Ò¯Ò¯ÑÐ³ÑÑ</h2><button class="btn btn-primary" onclick="createLink()">Ð¨Ð¸Ð½Ñ Ð»Ð¸Ð½Ðº Ò¯Ò¯ÑÐ³ÑÑ</button><div id="link-result" style="margin-top:12px"></div></div><div class="card"><h2>ÐÐ¸Ð½ÐºÒ¯Ò¯Ð´</h2><table><tr><th>ÐÐ¸Ð½Ðº ID</th><th>Ò®Ò¯ÑÐ³ÑÑÑÐ½</th><th>Ð¡ÑÐ°ÑÑÑ</th><th>ÐÑÑÑÑÐ½</th></tr>' + rows + '</table></div><script>async function uploadVideo(){const file=document.getElementById("video-file").files[0];if(!file)return alert("Ð¤Ð°Ð¹Ð» ÑÐ¾Ð½Ð³Ð¾Ð½Ð¾ ÑÑ");const s=document.getElementById("status-msg"),pw=document.getElementById("progrest-wrap"),pb=document.getElementById("progress-bar");s.textContent="URL Ð°Ð²Ñ Ð±Ð°Ð¹Ð½Ð°...";pw.style.display="block";try{const r1=await fetch("/admin/get-upload-url",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:file.name,contentType:file.type})});const{uploadUrl,key}=await r1.json();s.textContent="ÐÐ°Ð¹ÑÑÑÑÐ»Ð¶ Ð±Ð°Ð¹Ð½Ð°...";await new Promise((res,rej)=>{const x=new XMLHttpRequest();x.upload.onprogress=e=>{if(e.lengthComputable)pb.style.width=(e.loaded/e.total*100)+"%"};x.onload=()=>x.status<300?res():rej(new Error(x.status));x.onerror=rej;x.open("PUT",uploadUrl);x.setRequestHeader("Content-Type",file.type);x.send(file)});s.textContent="ÐÒ¯ÑÑÐ³ÑÐ¶ Ð±Ð°Ð¹Ð½Ð°...";await fetch("/admin/register-video",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key,filename:file.name,size:file.size,contentType:file.type})});s.textContent="ÐÐ¼Ð¶Ð¸Ð»ÑÑÐ°Ð¹!";pb.style.background="#10b981";setTimeout(()=>location.reload(),1500)}catch(e){s.textContent="ÐÐ»Ð´Ð°Ð°: "+e.message;pb.style.background="#ef4444"}}async function createLink(){const r=await fetch("/admin/create-link",{method:"POST"});const d=await r.json();if(d.linkUrl){document.getElementById("link-result").innerHTML="<div style=\\"background:#111;padding:12px;border-radius:8px;word-break:break-all\\"><a href=\\""+d.linkUrl+"\\" target=\\"_blank\\" style=\\"color:#6ee7b7\\">"+d.linkUrl+"</a></div>"}else{document.getElementById("link-result").innerHTML="<p style=\\"color:#f87171\\">"+(d.error||"ÐÐ»Ð´Ð°Ð°")+"</p>"}}<\/script></body></html>');
+  res.send('<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin Dashboard</title><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;background:#0f0f0f;color:#fff;margin:0;padding:20px}h1{color:#6366f1;margin-bottom:24px}.card{background:#1a1a1a;border-radius:12px;padding:24px;margin-bottom:20px}.card h2{margin:0 0 16px;font-size:18px;color:#a5b4fc}.btn{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:14px;margin:4px}.btn-primary{background:#6366f1;color:#fff}.btn-primary:hover{background:#4f46e5}input[type=file]{width:100%;padding:10px;background:#111;border:1px solid #333;color:#fff;border-radius:8px;font-size:14px;margin-bottom:12px}.stat{display:inline-block;background:#111;padding:12px 20px;border-radius:8px;margin:4px;text-align:center}.stat-num{font-size:28px;font-weight:bold;color:#6366f1}.stat-label{font-size:12px;color:#9ca3af}#progress-bar{width:0%;height:8px;background:#6366f1;border-radius:4px;transition:width 0.3s}#progress-wrap{background:#222;border-radius:4px;margin-top:8px;display:none}#status-msg{margin-top:8px;font-size:14px;color:#9ca3af}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #222}th{color:#9ca3af;font-weight:normal}</style></head><body><h1>Admin Dashboard</h1><div class="card"><h2>\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a</h2><div class="stat"><div class="stat-num">' + videos.length + '</div><div class="stat-label">\u041d\u0438\u0439\u0442 \u0432\u0438\u0434\u0435\u043e</div></div><div class="stat"><div class="stat-num">' + links.length + '</div><div class="stat-label">\u041d\u0438\u0439\u0442 \u043b\u0438\u043d\u043a</div></div><div class="stat"><div class="stat-num">' + activeCount + '</div><div class="stat-label">\u0418\u0434\u044d\u0432\u0445\u0442\u044d\u0439</div></div><div class="stat"><div class="stat-num">' + unusedCount + '</div><div class="stat-label">\u0410\u0448\u0438\u0433\u043b\u0430\u0430\u0433\u04af\u0439</div></div></div><div class="card"><h2>\u0412\u0438\u0434\u0435\u043e \u043e\u0440\u0443\u0443\u043b\u0430\u0445</h2>' + (latestVideo ? '<p style="color:#6ee7b7;font-size:14px;margin-bottom:12px">\u041e\u0434\u043e\u043e\u0433\u0438\u0439\u043d \u0432\u0438\u0434\u0435\u043e: <strong>' + (latestVideo.filename||latestVideo.id) + '</strong></p>' : '') + '<input type="file" id="video-file" accept="video/*"><div id="progress-wrap"><div id="progress-bar"></div></div><div id="status-msg"></div><button class="btn btn-primary" onclick="uploadVideo()" style="margin-top:8px">\u0411\u0430\u0439\u0440\u0448\u0443\u0443\u043b\u0430\u0445</button></div><div class="card"><h2>\u041b\u0438\u043d\u043a \u04af\u04af\u0441\u0433\u044d\u0445</h2><button class="btn btn-primary" onclick="createLink()">\u0428\u0438\u043d\u044d \u043b\u0438\u043d\u043a \u04af\u04af\u0441\u0433\u044d\u0445</button><div id="link-result" style="margin-top:12px"></div></div><div class="card"><h2>\u041b\u0438\u043d\u043a\u04af\u04af\u0434</h2><table><tr><th>\u041b\u0438\u043d\u043a ID</th><th>\u04ae\u04af\u0441\u0433\u044d\u0441\u044d\u043d</th><th>\u0421\u0442\u0430\u0442\u0443\u0441</th><th>\u041d\u044d\u044d\u0441\u044d\u043d</th></tr>' + rows + '</table></div><script>async function uploadVideo(){const file=document.getElementById("video-file").files[0];if(!file)return alert("\u0424\u0430\u0439\u043b \u0441\u043e\u043d\u0433\u043e\u043d\u043a \u0443\u0443");const s=document.getElementById("status-msg"),pw=document.getElementById("progress-wrap"),pb=document.getElementById("progress-bar");s.textContent="URL \u0430\u0432\u0447 \u0431\u0430\u0439\u043d\u0430...";pw.style.display="block";try{const r1=await fetch("/admin/get-upload-url",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:file.name,contentType:file.type})});const{uploadUrl,key}=await r1.json();s.textContent="\u0411\u0430\u0439\u0440\u0448\u0443\u0443\u043b\u0436 \u0431\u0430\u0439\u043d\u0430...";await new Promise((res,rej)=>{const x=new XMLHttpRequest();x.upload.onprogress=e=>{if(e.lengthComputable)pb.style.width=(e.loaded/e.total*100)+"%"};x.onload=()=>x.status<300?res():rej(new Error(x.status));x.onerror=rej;x.open("PUT",uploadUrl);x.setRequestHeader("Content-Type",file.type);x.send(file)});s.textContent="\u0411\u04af\u0440\u0442\u0433\u044e\u0436 \u0431\u0430\u0439\u043d\u0430...";await fetch("/admin/register-video",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key,filename:file.name,size:file.size,contentType:file.type})});s.textContent="\u0410\u043c\u0436\u0438\u043b\u0442\u0442\u0430\u0439!";pb.style.background="#10b981";setTimeout(()=>location.reload(),1500)}catch(e){s.textContent="\u0410\u043b\u0434\u0430\u0430: "+e.message;pb.style.background="#ef4444"}}async function createLink(){const r=await fetch("/admin/create-link",{method:"POST"});const d=await r.json();if(d.linkUrl){document.getElementById("link-result").innerHTML="<div style=\\"background:#111;padding:12px;border-radius:8px;word-break:break-all\\"><a href=\\""+d.linkUrl+"\\" target=\\"_blank\\" style=\\"color:#6ee7b7\\">"+d.linkUrl+"</a></div>"}else{document.getElementById("link-result").innerHTML="<p style=\\"color:#f87171\\">"+(d.error||"\u0410\u043b\u0434\u0430\u0430")+"</p>"}}<\/script></body></html>');
 });
 
 app.post('/admin/get-upload-url', requireAdmin, async (req, res) => {
@@ -177,7 +177,7 @@ app.post('/admin/register-video', requireAdmin, async (req, res) => {
 
 app.post('/admin/create-link', requireAdmin, async (req, res) => {
   const video = await db.getLatestVideo();
-  if (!video) return res.json({ error: 'ÐÐ¸Ð´ÐµÐ¾ Ð±Ð°Ð¹ÑÐ³Ò¯Ð¹ Ð±Ð°Ð¹Ð½Ð°' });
+  if (!video) return res.json({ error: '\u0412\u0438\u0434\u0435\u043e \u0431\u0430\u0439\u0445\u0433\u04af\u0439 \u0431\u0430\u0439\u043d\u0430' });
   const linkId = nanoid(10);
   await db.saveLink(linkId, { id: linkId, videoId: video.id, createdAt: Date.now() });
   const baseUrl = process.env.BASE_URL || ('https://' + req.headers.host);
@@ -187,183 +187,1141 @@ app.post('/admin/create-link', requireAdmin, async (req, res) => {
 app.get('/admin/videos', requireAdmin, async (req, res) => res.json(await db.getAllVideos()));
 app.get('/admin/links', requireAdmin, async (req, res) => res.json(await db.getAllLinks()));
 
-// Watch: Ð½ÑÐ³ Ð»Ð¸Ð½Ðº = Ð½ÑÐ³ ÑÒ¯Ð½ = Ð½ÑÐ³ ÑÓ©ÑÓ©Ó©ÑÓ©Ð¼Ð¶
+// Watch: one link = one person = one device
 app.get('/watch/:linkId', async (req, res) => {
   try {
     const { linkId } = req.params;
     const link = await db.getLink(linkId);
     if (!link) {
-      return res.status(404).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px"><h2>ÐÐ¸Ð½Ðº Ð¾Ð»Ð´ÑÐ¾Ð½Ð³Ò¯Ð¹</h2></body></html>');
+      return res.status(404).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px"><h2>\u041b\u0438\u043d\u043a \u043e\u043b\u0434\u0441\u043e\u043d\u0433\u04af\u0439</h2></body></html>');
     }
     const age = Date.now() - link.createdAt;
     if (age > 72 * 60 * 60 * 1000) {
-      return res.status(410).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px"><h2>ÐÐ¸Ð½ÐºÐ¸Ð¹Ð½ ÑÑÐ³Ð°ÑÐ°Ð° Ð´ÑÑÑÑÐ°Ð½</h2></body></html>');
+      return res.status(410).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px"><h2>\u041b\u0438\u043d\u043a\u0438\u0439\u043d \u0445\u0443\u0433\u0430\u0446\u0430\u0430 \u0434\u0443\u0443\u0441\u0441\u0430\u043d</h2></body></html>');
     }
     const video = await db.getVideo(link.videoId);
     if (!video) {
-      return res.status(404).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px"><h2>ÐÐ¸Ð´ÐµÐ¾ Ð¾Ð»Ð´ÑÐ¾Ð½Ð³Ò¯Ð¹</h2></body></html>');
+      return res.status(404).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px"><h2>\u0412\u0438\u0434\u0435\u043e \u043e\u043b\u0434\u0441\u043e\u043d\u0433\u04af\u0439</h2></body></html>');
     }
     const command = new GetObjectCommand({ Bucket: BUCKET, Key: video.key || video.filename });
     const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
-    const html = '<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>ÐÐ¸Ð´ÐµÐ¾</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh}video{max-width:100%;width:100%}</style></head><body><video controls autoplay controlsList="nodownload" oncontextmenu="return false"><source src="' + signedUrl + '" type="video/mp4"></video></body></html>';
+    const html = '<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>\u0412\u0438\u0434\u0435\u043e</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh}video{max-width:100%;width:100%}</style></head><body><video controls autoplay controlsList="nodownload" oncontextmenu="return false"><source src="' + signedUrl + '" type="video/mp4"></video></body></html>';
     res.send(html);
   } catch (err) {
     console.error('Watch error:', err);
-    res.status(500).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px"><h2>ÐÐ»Ð´Ð°Ð° Ð³Ð°ÑÐ»Ð°Ð°</h2><p>' + (err.message || '') + '</p></body></html>');
+    res.status(500).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px"><h2>\u0410\u043b\u0434\u0430\u0430 \u0433\u0430\u0440\u043b\u0430\u0430</h2><p>' + (err.message || '') + '</p></body></html>');
   }
 });
 
 app.get('/stream/:linkId', async (req, res) => {
   const { linkId } = req.params;
   const link = await db.getLink(linkId);
-  if (!link) return res.status(404).json({ error: 'ÐÐ¸Ð½Ðº Ð¾Ð»Ð´ÑÐ¾Ð½Ð³Ò¯Ð¹' });
-  const cookies = parseCookies(req);
-  const cookieToken = cookies['v_' + linkId];
-  if (!link.activatedAt || Date.now() - link.activatedAt > 72 * 3600 * 1000) return res.status(403).json({ error: 'Ð¥ÑÐ³Ð°ÑÐ°Ð° Ð´ÑÑÑÑÐ°Ð½' });
-  if (!link.deviceToken || cookieToken !== link.deviceToken) return res.status(403).json({ error: 'ÐÓ©Ð²ÑÓ©Ó©ÑÓ©Ð»Ð³Ò¯Ð¹' });
-  const video = await db.getVideo(link.videoId);
-  if (!video) return res.status(404).json({ error: 'ÐÐ¸Ð´ÐµÐ¾ Ð¾Ð»Ð´ÑÐ¾Ð½Ð³Ò¯Ð¹' });
-  try {
-    const command = new GetObjectCommand({ Bucket: BUCKET, Key: video.key });
-    const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
-    res.redirect(signedUrl);
-  } catch (err) { console.error('stream error:', err); res.status(500).json({ error: err.message }); }
-});
+  if (!link) return res.status(404).json({ error: '\u041b\u0438\u043d\u043a \u043e\u043b\u0434\u0441\u043e\u043d\u0433\u04af\u0439'_JN�ۜ�����Y\�H\��P����Y\��\JN�ۜ�����YU��[�H����Y\��ݗ��
+�[��YNY�
+[[�˘X�]�]Y]]K����
+HH[�˘X�]�]Y]�
+̈
+�͌
+�L
+H�]\���\˜�]\�
+�K���ۊ�\��܎�	�L
+�WL
 
-function playerPage(linkId) {
-  return '<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ÐÐ¸Ð´ÐµÐ¾</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;user-select:none}#player{width:100%;max-width:900px;aspect-ratio:16/9;background:#111;border-radius:8px;overflow:hidden}video{width:100%;height:100%}.info{margin-top:14px;font-size:13px;color:#6b7280;text-align:center}.warn{margin-top:6px;font-size:12px;color:#f59e0b;text-align:center}</style><script>document.addEventListener("contextmenu",e=>e.preventDefault());document.addEventListener("keydown",e=>{if(e.key==="F12"||(e.ctrlKey&&e.shiftKey&&["I","J","C","K"].includes(e.key))||(e.ctrlKey&&e.key==="U"))e.preventDefault();});<\/script></head><body><div id="player"><video controls autoplay controlsList="nodownload" disablePictureInPicture oncontextmenu="return false"><source src="/stream/' + linkId + '" type="video/mp4">ÐÑÐ¼Ð¶Ð¸ÑÐ³Ò¯Ð¹ Ð±Ð°Ð¹Ð½Ð°.</video></div><div class="info">72 ÑÐ°Ð³Ð¸Ð¹Ð½ Ð´Ð¾ÑÐ¾Ñ Ò¯Ð·ÑÑ Ð±Ð¾Ð»Ð¾Ð¼Ð¶ÑÐ¾Ð¹</div><div class="warn">ÐÐ¸Ð½Ðº Ð·Ó©Ð²ÑÓ©Ð½ ÑÐ°Ð½Ñ ÑÓ©ÑÓ©Ó©ÑÓ©Ð¼Ð¶Ð¸Ð´ Ð°Ð¶Ð¸Ð»Ð»Ð°Ð½Ð° â Ð´Ð°Ð¼Ð¶ÑÑÐ»Ð±Ð°Ð» Ð°Ð¶Ð¸Ð»Ð»Ð°ÑÐ³Ò¯Ð¹</div></body></html>';
-}
+�L
+��L
+�L
 
-// Facebook Messenger Bot
-app.get('/webhook', (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-  if (mode === 'subscribe' && token === process.env.FB_VERIFY_TOKEN) {
-    res.status(200).send(challenge);
-  } else { res.status(403).end(); }
-});
 
-app.post('/webhook', async (req, res) => {
-  const body = req.body;
-  if (body.object !== 'page') return res.status(404).end();
-  res.status(200).send('EVENT_RECEIVED');
-  for (const entry of (body.entry || [])) {
-    for (const event of (entry.messaging || [])) {
-      const senderId = event.sender && event.sender.id;
-      if (!senderId || senderId === entry.id) continue;
-      if (event.message) {
-        const hasImage = (event.message.attachments || []).some(a => a.type === 'image');
-        if (hasImage) {
-          const imgAtt = (event.message.attachments || []).find(a => a.type === 'image');
-          const imageUrl = imgAtt && imgAtt.payload && imgAtt.payload.url;
-          await handlePaymentScreenshot(senderId, imageUrl);
-        } else if (event.message.text) {
-          await sendBankInfo(senderId);
-        }
-      }
-    }
-    for (const change of (entry.changes || [])) {
-      if (change.field === 'feed' && change.value && change.value.item === 'comment') {
-        const comment = (change.value.message || '').trim();
-        const commenterId = change.value.from && change.value.from.id;
-        if (!commenterId) continue;
-        if (comment === '1' || /Ð°Ð²Ð½Ð°|Ò¯Ð·Ð½Ñ|Ð°Ð²Ð¼Ð°Ð°Ñ/i.test(comment)) {
-          await sendBankInfo(commenterId);
-        }
-      }
-    }
-  }
-});
+�L
+�L
+�L
+�L
 
-async function sendBankInfo(recipientId) {
-  await sendFbMessage(recipientId, `â "ÐÐ°Ð²ÑÐ½ Ð½Ð°Ð¹Ð· Ð¾ÑÐ¸Ð½" ÐºÐ¸Ð½Ð¾ Ò¯Ð·ÑÑÐ¸Ð¹Ð³ ÑÒ¯ÑÐ²ÑÐ»
-ð¿ ÐÐ¸Ð½Ð¾ Ò¯Ð·ÑÑÐ¸Ð¹Ð³ ÑÒ¯ÑÐ²ÑÐ» Ð´Ð¾Ð¾ÑÑ Ð·Ð°Ð°Ð²ÑÑÐ³ Ð´Ð°Ð³Ð°Ð°ÑÐ°Ð¹:
+�L
 
-ð° Ð¢Ó©Ð»Ð±Ó©Ñ ÑÐ¸Ð»Ð¶Ò¯Ò¯Ð»ÑÑ Ð¼ÑÐ´ÑÑÐ»ÑÐ»:
-â¢ ÐÐ°Ð½Ðº: Ð¥Ð°Ð°Ð½ Ð±Ð°Ð½Ðº ð¦
-â¢ ÐÐ°Ð½ÑÐ½Ñ Ð´ÑÐ³Ð°Ð°Ñ: MN54 000500 5300692947
-â¢ ÐÐ°Ð½Ñ ÑÐ·ÑÐ¼ÑÐ¸Ð³Ñ: ÐÐ°Ð¼Ð±Ð°Ð¶Ð°Ð² ÐÓ©Ð½ÑÐ±Ð°ÑÑ
-â¢ Ð¢Ó©Ð»Ð±Ó©ÑÐ¸Ð¹Ð½ Ð´Ò¯Ð½: 5000 ÑÓ©Ð³ÑÓ©Ð³
+�L
 
-ð ÐÒ¯Ð¹Ð»Ð³ÑÑÐ½Ð¸Ð¹ ÑÑÐ³Ð° (Ð·Ð°Ð°Ð²Ð°Ð» Ð±Ð¸ÑÐ½Ñ!): â Ó¨Ó©ÑÐ¸Ð¹Ð½ Facebook Ð½ÑÑÑÑ Ð±Ð¸ÑÑÑÑÑÐ¹
+WL
 
-ð¸ ÐÐ°ÑÐ°Ð°Ð³Ð¸Ð¹Ð½ Ð°Ð»ÑÐ°Ð¼:
-1. ÐÒ¯Ð¹Ð»Ð³ÑÑ Ð°Ð¼Ð¶Ð¸Ð»ÑÑÐ°Ð¹ Ð±Ð¾Ð»ÑÐ½Ñ ÑÐºÑÐ¸Ð½ÑÐ¾ÑÑÐ³ Ð°Ð²Ð½Ð° ÑÑ
-2. Ð­Ð½Ñ ÑÐ°Ñ ÑÑÑ ÑÐ²ÑÑÐ»Ð½Ð° ÑÑ
+WL
+�L
+�	�JNY�
+[[�˙]�X�U��[�����YU��[�OOH[�˙]�X�U��[�H�]\���\˜�]\�
+�K���ۊ�\��܎�	�L
+M�L
+NWL
+̗L
 
-â° Ð¥ÑÐ³Ð°ÑÐ°Ð°:
-â¢ Ð¢Ó©Ð»Ð±Ó©Ñ Ð±Ð°ÑÐ°Ð»Ð³Ð°Ð°Ð¶ÑÐ°Ð½Ñ Ð´Ð°ÑÐ°Ð° Ð»Ð¸Ð½Ðº Ð°Ð²ÑÐ¾Ð¼Ð°ÑÐ°Ð°Ñ Ð¸ÑÐ½Ñ
-â¢ ÐÐ¸Ð½Ðº 72 ÑÐ°Ð³ (3 ÑÐ¾Ð½Ð¾Ð³) ÑÒ¯ÑÐ¸Ð½ÑÑÐ¹ Ð±Ð°Ð¹Ð½Ð°
+L
+NWL
+NWL
 
-â¡ ÐÓ©Ð²Ð»Ó©Ð¼Ð¶: ÐÒ¯Ð¹Ð»Ð³ÑÑ ÑÐ¸Ð¹ÑÐ´ÑÑ Ð¼ÑÐ´ÑÑÐ»Ð»Ð¸Ð¹Ð³ ÑÐ³ ÑÐ°Ñ ÑÐ°Ð»Ð³Ð°Ð°ÑÐ°Ð¹!
-ÐÐ¸Ð½Ð¾ Ò¯Ð·ÑÑÑÐ´ Ð±ÑÐ»ÑÐ½ Ð±Ð¾Ð»ÑÐ¾Ð½ ÑÑ? ð`);
-}
+L
+NWL
+ؗL
+��L
+Y�L
+�I�JN�ۜ��Y[�H]�Z]���]�Y[�[�˝�Y[�Y
+NY�
+]�Y[�H�]\���\˜�]\�
+
+K���ۊ�\��܎�	�L
+L�L
+�L
+�L
+�WL
+�HL
+�WL
+ؗL
+�L
 
-async function handlePaymentScreenshot(senderId, imageUrl) {
-  try {
-    const profileRes = await fetch('https://graph.facebook.com/v19.0/' + senderId + '?fields=name&access_token=' + process.env.FB_PAGE_TOKEN);
-    const profile = await profileRes.json();
-    const fbName = (profile.name || '').toLowerCase().trim();
-    console.log('FB name:', fbName, 'imageUrl:', imageUrl ? 'present' : 'missing');
+WL
+�WL
+�L
+��L
+Y�L
+�I�JN�H�ۜ���[X[�H�]��]ؚ�X���[X[�
+��X��]��P��U�^N��Y[˚�^HJN�ۜ��YۙY\�H]�Z]�]�YۙY\�
+����[X[��^\�\�[��͌JN�\˜�Y\�X�
+�YۙY\�
+NH�]�
+\��H��ۜ��K�\��܊	���X[H\��܎��\��N��\˜�]\�
+L
+K���ۊ�\��܎�\���Y\��Y�HJN�B�JN��[��[ۈ^Y\�Y�J[��Y
+H�]\��	�Q��TH[�[[��H�[���XY�Y]H�\��]H�U�N��Y]H�[YOH��Y]�ܝ��۝[�H��YY]�X�K]�Y[�]X[\��[OLH��]O�L
+L�L
+�L
+�L
+�WL
+�O�]O��[O���X\��[���Y[�Ό؛�\�^�[�Θ�ܙ\�X��X��^ؘX��ܛ�[������܎�ٙ���ZY��L��\�^N��^ٛ^Y\�X�[ێ���[[��[YۋZ][\Θ�[�\�ڝ\�Y�KX�۝[���[�\�ٛ۝Y�[Z[N�\�X[�[��\�\�Y��\�\�\�[X���ۙ_H�^Y\���Y�L	N�X^]�Y�L�\�X�\�][ΌM��NؘX��ܛ�[���LLN؛ܙ\�\�Y]\Ύ�ݙ\���ΚY[�]�Y[���Y�L	N�ZY��L	_K�[����X\��[�]��Mٛ۝\�^�N�L����܎�͘�̎�^X[Yێ��[�\�K��\���X\��[�]���ٛ۝\�^�N�L����܎�ٍNYL��^X[Yێ��[�\�O��[O��ܚ\���[Y[��Y]�[�\�[�\���۝^Y[�H�OO�K��]�[�Y�][
 
-    if (!imageUrl) {
-      await sendFbMessage(senderId, 'ÐÑÑÐ°Ð³Ð½Ñ Ð»Ð¸Ð½Ðº Ð°Ð»Ð´ÑÐ°Ð½. ÐÐ°ÑÐ¸Ð½ ÑÐ²ÑÑÐ»Ð½Ð° ÑÑ.');
-      return;
-    }
+JN���[Y[��Y]�[�\�[�\���^Y�ۈ�OO��Y�K��^OOOH��L��
+K����^I��K��Y��^I��ȒH�����ȋ�ȗK�[��Y\�K��^JJ_
+K����^I��K��^OOOH�H�JYK��]�[�Y�][
 
-    const imgRes = await fetch(imageUrl);
-    const imgBuffer = await imgRes.arrayBuffer();
-    const base64Img = Buffer.from(imgBuffer).toString('base64');
-    const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+N�JN���ܚ\��XY���O�]�YH�^Y\����Y[��۝���]]�^H�۝���\�H����ۛ�Y�\�X�TX�\�R[�X�\�Hۘ�۝^Y[�OH��]\���[�H����\��Hܘ�H����X[K��
+�[��Y
+�	Ȉ\OH��Y[��\
+��L
+ML
 
-    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        messages: [{ role: 'user', content: [
-          { type: 'image', source: { type: 'base64', media_type: contentType, data: base64Img } },
-          { type: 'text', text: 'Ð­Ð½Ñ Ð±Ð°Ð½ÐºÐ½Ñ Ð³Ò¯Ð¹Ð»Ð³ÑÑÐ½Ð¸Ð¹ screenshot. ÐÐ°ÑÐ°Ð°Ñ Ð¼ÑÐ´ÑÑÐ»Ð»Ð¸Ð¹Ð³ Ð³Ð°ÑÐ³Ð°:\n1. Ð¥Ò¯Ð»ÑÑÐ½ Ð°Ð²Ð°Ð³ÑÐ¸Ð¹Ð½ Ð´Ð°Ð½ÑÐ½Ñ Ð´ÑÐ³Ð°Ð°Ñ (Ð·Ó©Ð²ÑÓ©Ð½  ÑÐ¾Ð¾)\n2. ÐÒ¯Ð¹Ð»Ð³ÑÑÐ½Ð¸Ð¹ ÑÑÐ³Ð° ÑÑÐ²ÑÐ»Ñ Ð²ÑÐ°Ð¹Ð»Ð±Ð°ÑÐ¸Ð² ÑÑÐºÑÑ\n\nÐÓ©Ð²ÑÓ©Ð½ JSON Ó©Ð³Ð½Ó© Ò¯Ò¯: {"account":"...","description":"..."}' }
-        ]}]
-      })
-    });
-    const claudeData = await claudeRes.json();
-    const rawText = (claudeData.content && claudeData.content[0] && claudeData.content[0].text) || '';
-    console.log('Claude rawText:', rawText.substring(0, 300));
+WL
+��L
+͗L
+�L
 
-    const accountOk = rawText.includes('5300692947');
 
-    let descLower = '';
-    try {
-      const m = rawText.match(/description["\s]*:["\s]*"([^"]+)"/);
-      if (m) descLower = m[1].toLowerCase();
-    } catch(e) {}
-    const nameOk = fbName && fbName.split(' ').some(part => part.length > 1 && descLower.includes(part));
+WL
+��L
+Y�L
+�HL
+�WL
+�L
+�WL
+�L
+��ݚY[Ϗ�]��]��\��H�[��ȏ�̈L
 
-    if (!accountOk) {
-      await sendFbMessage(senderId, 'â ÐÐ°Ð½ÑÐ½Ñ Ð´ÑÐ³Ð°Ð°Ñ ÑÐ°Ð°ÑÑÐ°Ð½Ð³Ò¯Ð¹.\n\nÐ¨Ð¸Ð»Ð¶Ò¯Ò¯Ð»ÑÑ Ð´Ð°Ð½Ñ: MN54 000500 5300692947 (Ð¥Ð°Ð°Ð½ Ð±Ð°Ð½Ðº)\n\nÐÓ©Ð² Ð´Ð°Ð½ÑÐ°Ð½Ð´ ÑÐ¸Ð»Ð¶Ò¯Ò¯Ð»ÑÑÐ´ screenshot Ð´Ð°ÑÐ¸Ð½ ÑÐ²ÑÑÐ»Ð½Ð° ÑÑ.');
+
+�L
+�L
+��L
+�L
+�WL
+�L
+�L
+�WL
+
+�L
+�WL
+
+L
+Y�L
+��L
+
+WL
+
+
+HL
+�WL
+�WL
+ؗL
+�WL
+��L
+͗L
+
+�L
+�WL
+�O�]��]��\��H��\����L
+X�L
+�L
+�L
+�HL
+��L
+NWL
+̗L
+
+
+WL
+NWL
+�L
+
+�L
+�L
+�L
+
+�L
+
+�L
+NWL
+
+
+WL
+NWL
+NWL
+
+L
+NWL
+��L
+͗L
+�L
+�L
+�L
+͗L
+�L
+ؗL
+ؗL
+�L
+�L
+�L�ML
+�L
+�L
+��L
+͗L
+
+�L
+
+�L
+ؗL
+�WL
+�L
+؈L
+�L
+͗L
+�L
+ؗL
+ؗL
+�L
+
+
+WL
+��L
+Y�L
+�O�]��؛�O��[��B�����X�X����Y\��[��\����\��]
+	���X�����
+�\K�\�HO��ۜ�[�HH�\K�]Y\�V��X��[�I�N�ۜ���[�H�\K�]Y\�V��X���\�Y�W���[��N�ۜ��[[��HH�\K�]Y\�V��X���[[��I�NY�
+[�HOOH	��X��ܚX�I�	����[�OOH���\�˙[�����ՑT�Q�W���S�H�\˜�]\��
+K��[�
+�[[��JNH[�H��\˜�]\�
+�K�[�
+
+N�B�JN�\���
+	���X�����\�[��
+�\K�\�HO��ۜ���HH�\K���NY�
+��K�ؚ�X�OOH	�Y�I�H�]\���\˜�]\�
+
+K�[�
+
+N�\˜�]\��
+K��[�
+	�U�S�ԑP�RU�Q	�N�܈
+�ۜ�[��Hو
+��K�[��H�JJH�܈
+�ۜ�]�[�و
+[��K�Y\��Y�[���JJH�ۜ��[�\�YH]�[���[�\�	��]�[���[�\��YY�
+\�[�\�Y�[�\�YOOH[��K�Y
+H�۝[�YNY�
+]�[��Y\��Y�JH�ۜ�\�[XY�HH
+]�[��Y\��Y�K�]X�Y[���JK���YJHO�K�\HOOH	�[XY�I�NY�
+\�[XY�JH�ۜ�[Y�]H
+]�[��Y\��Y�K�]X�Y[���JK��[�
+HO�K�\HOOH	�[XY�I�N�ۜ�[XY�U\�H[Y�]	��[Y�]�^[�Y	��[Y�]�^[�Y�\�]�Z][�T^[Y[��ܙY[���
+�[�\�Y[XY�U\�
+NH[�HY�
+]�[��Y\��Y�K�^
+H]�Z]�[��[��[����[�\�Y
+NB�B�B��܈
+�ۜ��[��Hو
+[��K��[��\��JJHY�
+�[��K��Y[OOH	ٙYY	�	���[��K��[YH	���[��K��[YK�][HOOH	���[Y[�	�H�ۜ���[Y[�H
+�[��K��[YK�Y\��Y�H	��K��[J
+N�ۜ���[Y[�\�YH�[��K��[YK����H	���[��K��[YK����K�YY�
+X��[Y[�\�Y
+H�۝[�YNY�
+��[Y[�OOH	�I��L
+�L
+̗L
+�L
+�L
+Y�L
+��L
+�L
+
+_L
+�L
+̗L
+��L
+�L
+�L
+
+�K�\�
+��[Y[�
+JH]�Z]�[��[��[�����[Y[�\�Y
+NB�B�B�B�JN�\�[���[��[ۈ�[��[��[����X�\Y[�Y
+H]�Z]�[���Y\��Y�J�X�\Y[�YL��
+H�L
+LL
+�L
+̗L
+
+�L
+�L
+�L
+�L
+�WL
+��L
+�WL
+
+
+WL
+�L
+��L
+�WL
+�L
+�L
+�HL
+Y�L
+��L
+
+WL
+
+
+WL
+�L
+�WL
+��L
+
+
+WL
+Y�L
+
+WL
+̗L
+
+L
+؂�LY��وL
+XWL
+�L
+�L
+�HL
+Y�L
+��L
+
+WL
+
+
+WL
+�L
+�WL
+��L
+
+
+WL
+Y�L
+
+WL
+̗L
+
+WL
+؈L
+�L
+�WL
+�WL
+
+L
+
+
+HL
+��L
+�L
+�L
+̗L
+
+L
+
+�L
+��L
+�L
+�L
+��L
+�L
+�L
+
+L
+�L
+�N���LY��L
+��L
+NWL
+ؗL
+�WL
+NWL
+
+L
+
+L
+�L
+ؗL
+͗L
+Y�L
+Y�L
+ؗL
+
+WL
+
+
+HL
+��L
+
+L
+�L
+
+L
+
+L
+ؗL
+
+WL
+؎��L���L
+LWL
+�L
+�L
+�N�L
+�WL
+�L
+�L
+�L
+�WL
+�L
+�L
+�HLY��M��L���L
+ML
+�L
+�L
+
+WL
+�L
+
+�L
+�L
+
+�L
+��L
+�L
+�L
+
+�S�M
+L
+L�
+�L�M
+L���L
+ML
+�L
+�L
+
+HL
+
+WL
+��L
+
+WL
+��L
+
+L
+�L
+��L
+
+
+ΈL
+ML
+�L
+��L
+�WL
+�L
+͗L
+�L
+̈L
+X�L
+NWL
+�L
+
+
+WL
+�WL
+�L
+
+�L
+
+�L���L
+��L
+NWL
+ؗL
+�WL
+NWL
+
+L
+�L
+�WL
+�L
+�L
+Y�L
+��
+LL
+
+�L
+NWL
+��L
+
+L
+NWL
+��LY�L
+L�L
+Y�L
+�WL
+ؗL
+��L
+
+L
+
+L
+�L
+�L
+�HL
+
+�L
+
+�L
+��L
+�
+L
+��L
+�L
+�L
+̗L
+�L
+؈L
+�WL
+�L
+
+
+�L
+�L
+
+HJN�L�NL�L
+NL
+NWL
+
+L
+�L
+�WL
+��X�X����L
+�L
+
+WL
+
+L
+
+WL
+
+HL
+�WL
+�L
+
+
+�L
+
+WL
+
+L
+
+L
+
+WL
+�B��LY��L
+ML
+�L
+
+L
+�L
+�L
+��L
+�L
+�WL
+�L
+�L
+ؗL
+
+
+WL
+�L
+�΂�K�L
+L�L
+Y�L
+�WL
+ؗL
+��L
+
+L
+
+HL
+�L
+��L
+͗L
+�L
+ؗL
+
+�L
+
+�L
+�L
+�HL
+�WL
+�WL
+ؗL
+
+WL
+�L
+
+�L
+
+WL
+�WL
+
+L
+�L
+�L
+
+L
+�WL
+
+�L
+
+�L
+��L
+�L
+̗L
+�L
+�L
+
+�L
+
+��L
+�L
+�L
+
+HL
+
+
+�L
+�L
+
+�L
+
+L
+
+�L
+
+�L
+
+�L
+̗L
+
+�L
+
+�L
+ؗL
+�L
+�L
+
+�L
+
+�L�ٌL
+�WL
+
+�L
+��L
+�L
+
+
+�L
+�L
+���L���L
+��L
+NWL
+ؗL
+�WL
+NWL
+
+L
+�WL
+�L
+
+�L
+�L
+ؗL
+��L
+�L
+�L
+͗L
+
+WL
+�L
+�L
+
+�L
+�L
+�L
+
+L
+�L
+�L
+ؗL
+�L
+�L
+�HL
+�L
+̗L
+
+�L
+�WL
+��L
+�L
+
+�L
+�L
+�L
+
+L
+�L
+
+L
+�L
+
+B�L���L
+X�L
+�L
+�L
+�H
+̈L
+
+
+�L
+�L
+��
+�L
+
+
+WL
+�WL
+�L
+�WL
+��HL
+
+
+WL
+Y�L
+
+
+�L
+�L
+�L
+
+�L
+
+WL
+�HL
+�WL
+�L
+�WL
+�L
+���L��LHL
+M�L
+NWL
+̗L
+ؗL
+NWL
+��L
+͎�L
+L�L
+Y�L
+�WL
+ؗL
+��L
+
+L
+
+HL
+
+
+WL
+�L
+�WL
+
+
+WL
+�L
+
+WL
+
+HL
+��L
+
+L
+�L
+
+L
+
+L
+ؗL
+ؗL
+�L
+�WL
+��L
+
+�L
+��L
+
+�L
+�L
+��L
+
+L
+�L
+ؗL
+��L
+�L
+�L
+
+L
+�L
+�B�L
+XWL
+�L
+�L
+�HL
+Y�L
+��L
+
+WL
+
+
+WL
+
+L
+�L
+�WL
+
+L
+ؗL
+
+L
+�L
+�WL
+�WL
+ؗL
+
+WL
+�WL
+�L
+
+�L
+
+��LY��
+NB��\�[���[��[ۈ[�T^[Y[��ܙY[���
+�[�\�Y[XY�U\�
+H�H�ۜ��ٚ[T�\�H]�Z]�]�
+	�΋��ܘ\��X�X���˘��K݌NK���
+��[�\�Y
+�	�ٚY[�[�[YI�X��\�����[�I�
+����\�˙[������Q�W���S�N�ۜ��ٚ[HH]�Z]�ٚ[T�\˚��ۊ
+N�ۜ����[YHH
+�ٚ[K��[YH	��K����\��\�J
+K��[J
+N�ۜ��K���	ѐ��[YN�����[YK	�[XY�U\���[XY�U\��	��\�[�	��	�Z\��[���N�Y�
+Z[XY�U\�
+H]�Z]�[���Y\��Y�J�[�\�Y	�L
+M�L
+
+�L
+
+L
+�L
+��L
+�L
+
+�L
+ؗL
+�L
+�L
+�HL
+�L
+ؗL
+�L
+
+WL
+�L
+��L
+ML
+�L
+
+
+WL
+�L
+�L
+
+�L
+̗L
+
+�L
+
+�L
+ؗL
+�L
+�L
+
+�L
+
+ˉ�N�]\��B���ۜ�[Yԙ\�H]�Z]�]�
+[XY�U\�
+N�ۜ�[YНY��\�H]�Z][Yԙ\˘\��^P�Y��\�
+N�ۜ��\�M�[Y�H�Y��\�����J[YНY��\�K����[��	ؘ\�M�	�N�ۜ��۝[�\HH[Yԙ\˚XY\�˙�]
+	��۝[�]\I�H	�[XY�KڜY����ۜ��]YT�\�H]�Z]�]�
+	�΋��\K�[���X˘��K݌K�Y\��Y�\��Y]��	���	��XY\�Έ	��۝[�U\IΈ	�\X�][ۋڜ�ۉ��	�X\KZ�^IΈ���\�˙[���S���P��TW��VK�	�[���X�]�\��[ۉΈ	̌��L
+�LIK���N���Ӌ���[��Y�J[�[�	��]YKZZZ�KMMKL��LLI��X^���[�Έ��Y\��Y�\Έ����N�	�\�\���۝[���\N�	�[XY�I���\��N��\N�	ؘ\�M�	�YYXW�\N��۝[�\K]N��\�M�[Y�HK��\N�	�^	�^�	�L
+�L
+�L
+
+HL
+�WL
+�L
+�L
+�WL
+�L
+
+�L
+��L
+Y�L
+�WL
+ؗL
+��L
+
+L
+
+WL
+�L
+�L
+�H�ܙY[����L
+ML
+�L
+
+L
+�L
+�L
+
+
+HL
+��L
+
+L
+�L
+
+L
+
+L
+ؗL
+ؗL
+�L
+�WL
+��L
+��L
+�L
+
+L
+��L
+���K�L
+�WL
+Y�L
+ؗL
+
+L
+
+WL
+�L
+�L
+̗L
+�L
+��L
+
+
+�L
+�L
+�WL
+�L
+�L
+�L
+�L
+
+WL
+�L
+
+�L
+�L
+
+�L
+��L
+�L
+�L
+
+
+L
+��L
+NWL
+̗L
+
+
+WL
+NWL
+�L
+
+�L
+�WL
+�JW���L
+L�L
+Y�L
+�WL
+ؗL
+��L
+
+L
+
+WL
+�L
+�L
+�HL
+
+�L
+
+�L
+��L
+�L
+
+L
+
+WL
+̗L
+
+WL
+؈L
+
+�L
+�L
+�WL
+ؗL
+�WL
+�L
+
+L
+
+�L
+�WL
+�WL
+
+WL
+
+���L
+M�L
+NWL
+̗L
+
+
+WL
+NWL
+���ӈL
+NWL
+��L
+�L
+NHL
+Y�L
+Y��ȘX���[���������\�ܚ\[ۈ�������I�B�_WB�JB�JN�ۜ��]YQ]HH]�Z]�]YT�\˚��ۊ
+N�ۜ��]�^H
+�]YQ]K��۝[�	���]YQ]K��۝[��H	���]YQ]K��۝[��K�^
+H	���ۜ��K���	��]YH�]�^���]�^��X���[���
+JN��ۜ�X���[���H�]�^�[��Y\�	�L�
+�L�M
+��N�]\����\�H	���H�ۜ�HH�]�^�X]�
+�\�ܚ\[ۖȗ�J��ȗ�J��׈�J�H��NY�
+JH\����\�HV�WK����\��\�J
+NH�]�
+JH�B��ۜ��[YS��H���[YH	�����[YK��]
+	�	�K���YJ\�O�\��[���H	��\����\��[��Y\�\�
+JN�Y�
+XX���[���H]�Z]�[���Y\��Y�J�[�\�Y	�L���L
+ML
+�L
+�L
+
+WL
+�L
+
+�L
+�L
+
+�L
+��L
+�L
+�L
+
+L
+
+�L
+�L
+�L
+
+L
+
+WL
+�L
+�L
+��L
+Y�L
+�K���L
+�L
+�L
+43b\u0436\u04af\u04af\u043b\u044d\u0445 \u0434\u0430\u043d\u0441: MN54 000500 5300692947 (\u0425\u0430\u0430\u043d \u0431\u0430\u043d\u043a)\n\n\u0417\u04e9\u0432 \u0434\u0430\u043d\u0441\u0430\u043d\u0434 \u0448\u0438\u043b\u0436\u04af\u04af\u043b\u044e\u044e\u0434 screenshot \u0434\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.');
       return;
     }
     if (!nameOk) {
-      await sendFbMessage(senderId, 'â ÐÒ¯Ð¹Ð»Ð³ÑÑÐ½Ð¸Ð¹ ÑÑÐ³Ð° Ð´ÑÑÑ ÑÐ°Ð½Ñ ÑÑÐ¹ÑÐ±Ò¯Ò¯Ðº Ð½ÑÑ ("' + profile.name + '") Ð¾Ð»Ð´ÑÐ¾Ð½Ð³Ò¯Ð¹.\n\nÐÒ¯Ð¹Ð»Ð³ÑÑÐ½Ð¸Ð¹ ÑÑÐ³Ð° Ð´ÑÑÑ Ó©Ó©ÑÐ¸Ð¹Ð½ ÑÑÐ¹ÑÐ±Ò¯Ò¯Ðº Ð½ÑÑÐ¸Ð¹Ð³ Ð±Ð¸ÑÑÑÐ´ Ð´Ð°ÑÐ¸Ð½ ÑÐ²ÑÑÐ»Ð½Ð° ÑÑ.');
+      await sendFbMessage(senderId, '\u274c \u0413\u04af\u0439\u043b\u0433\u044e\u044e\u043d\u0438\u0439 \u0443\u0442\u0433\u0430 \u0434\u044e\u044e\u0440 \u0442\u0430\u043d\u044b \u0444\u044e\u0439\u0441\u0431\u04af\u04af\u043a \u043d\u044e\u0440 ("' + profile.name + '") \u043e\u043b\u0434\u0441\u043e\u043d\u0433\u04af\u0439.\n\n\u0413\u04af\u0439\u043b\u0433\u044e\u044e\u043d\u0438\u0439 \u0443\u0442\u0433\u0430 \u0434\u044e\u044e\u0440 \u04e9\u04e9\u0440\u0438\u0439\u043d \u0444\u044e\u0439\u0441\u0431\u04af\u04af\u043a \u043d\u044e\u0440\u0438\u0439\u0433 \u0431\u0438\u0447\u044e\u044e\u0434 \u0434\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.');
       return;
     }
 
     const video = await db.getLatestVideo();
-    if (!video) { await sendFbMessage(senderId, 'ÐÐ´Ð¾Ð¾Ð³Ð¾Ð¾Ñ Ð¸Ð´ÑÐ²ÑÑÑÐ¹ Ð²Ð¸Ð´ÐµÐ¾ Ð±Ð°Ð¹ÑÐ³Ò¯Ð¹.'); return; }
+    if (!video) { await sendFbMessage(senderId, '\u041e\u0434\u043e\u043e\u0433\u043e\u043e\u0440 \u0438\u0434\u044e\u0432\u0445\u0442\u044e\u0439 \u0432\u0438\u0434\u0435\u043e \u0431\u0430\u0439\u0445\u0433\u04af\u0439.'); return; }
     const linkId = nanoid(10);
     await db.saveLink(linkId, { id: linkId, videoId: video.id, createdAt: Date.now() });
     const linkUrl = process.env.BASE_URL + '/watch/' + linkId;
-    await sendFbMessage(senderId, 'â Ð¢Ó©Ð»Ð±Ó©Ñ Ð±Ð°ÑÐ°Ð»Ð³Ð°Ð°Ð¶Ð»Ð°Ð°!\n\nÐ¢Ð°Ð½Ñ Ð²Ð¸Ð´ÐµÐ¾ Ð»Ð¸Ð½Ðº:\n' + linkUrl + '\n\nâ° 72 ÑÐ°Ð³Ð¸Ð¹Ð½ Ð´Ð¾ÑÐ¾Ñ Ò¯Ð·Ð½Ñ Ò¯Ò¯.\nð ÐÐ¸Ð½Ðº Ð·Ó©Ð²ÑÓ©Ð½ ÑÐ°Ð½Ñ ÑÓ©ÑÓ©Ó©ÑÓ©Ð¼Ð¶Ð¸Ð´ Ð°Ð¶Ð¸Ð»Ð»Ð°Ð½Ð°.');
+    await sendFbMessage(senderId, '\u2705 \u0422\u04e9\u043b\u0431\u04e9\u0440 \u0431\u0430\u0442\u0430\u043b\u0433\u0430\u0430\u0436\u043b\u0430\u0430!\n\n\u0422\u0430\u043d\u044b \u0432\u0438\u0434\u0435\u043e \u043b\u0438\u043d\u043a:\n' + linkUrl + '\n\n\u23f0 72 \u0446\u0430\u0433\u0438\u0439\u043d \u0434\u043e\u0442\u043e\u0440 \u04af\u0437\u043d\u044e \u04af\u04af.\n\u1f512 \u041b\u0438\u043d\u043a \u0437\u04e9\u0432\u0445\u04e9\u043d \u0442\u0430\u043d\u044b \u0442\u04e9\u0445\u04e9\u04e9\u0440\u04e9\u043c\u0436\u0438\u0434 \u0430\u0436\u0438\u043b\u043b\u0430\u043d\u0430.');
   } catch(err) {
     console.error('Screenshot error:', err);
-    await sendFbMessage(senderId, 'Ð¡ÐºÑÐ¸Ð¹Ð½ÑÐ¾Ñ Ð±Ð¾Ð»Ð¾Ð²ÑÑÑÑÐ»Ð°ÑÐ°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°ÑÐ»Ð°Ð°. ÐÐ°ÑÐ¸Ð½ ÑÐ²ÑÑÐ»Ð½Ð° ÑÑ.');
+    await sendFbMessage(senderId, '\u0421\u043a\u0440\u0438\u0439\u043d\u0448\u043e\u0442 \u0431\u043e\u043b\u043e\u0432\u0441\u0440\u0443\u0443\u043b\u0430\u0445\u0430\u0434 \u0430\u043b\u0434\u0430\u0430 \u0433\u0430\u0440\u043b\u0430\u0430. \u0414\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.');
   }
 }
 
@@ -387,3 +1345,4 @@ initDb().then(() => {
   console.error('DB init failed:', err);
   process.exit(1);
 });
+                         
