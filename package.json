@@ -1,16 +1,20 @@
 {
   "name": "video-link-app",
   "version": "1.0.0",
-  "description": "Video one-time link sharing app",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1073.0",
+    "@aws-sdk/lib-storage": "^3.1073.0",
+    "@aws-sdk/s3-request-presigner": "^3.1073.0",
     "express": "^4.18.2",
-    "nanoid": "3.3.7",
-    "@aws-sdk/client-s3": "^3.600.0",
-    "@aws-sdk/s3-request-presigner": "^3.600.0",
+    "nanoid": "^3.3.7",
+    "node-fetch": "^2.7.0",
     "pg": "^8.11.3"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
