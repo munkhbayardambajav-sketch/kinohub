@@ -40,8 +40,10 @@ async function initDb() {
       video_id TEXT,
       created_at BIGINT,
       activated_at BIGINT,
-      device_token TEXT
+      device_token TEXT,
+      sender_psid TEXT
     );
+    ALTER TABLE links ADD COLUMN IF NOT EXISTS sender_psid TEXT;
     CREATE TABLE IF NOT EXISTS admin_sessions (
       id INTEGER PRIMARY KEY DEFAULT 1,
       token TEXT
@@ -78,11 +80,21 @@ const db = {
   },
   async saveLink(id, link) {
     await pool.query(
-      `INSERT INTO links (id, video_id, created_at, activated_at, device_token)
-       VALUES ($1,$2,$3,$4,$5)
-       ON CONFLICT (id) DO UPDATE SET video_id=$2, created_at=$3, activated_at=$4, device_token=$5`,
-      [id, link.videoId, link.createdAt, link.activatedAt || null, link.deviceToken || null]
+      `INSERT INTO links (id, video_id, created_at, activated_at, device_token, sender_psid)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (id) DO UPDATE SET video_id=$2, created_at=$3, activated_at=$4, device_token=$5, sender_psid=$6`,
+      [id, link.videoId, link.createdAt, link.activatedAt || null, link.deviceToken || null, link.senderPsid || null]
     );
+  },
+  async getLinkBySender(psid) {
+    const cutoff = Date.now() - 24 * 3600 * 1000;
+    const r = await pool.query(
+      'SELECT * FROM links WHERE sender_psid=$1 AND created_at > $2 ORDER BY created_at DESC LIMIT 1',
+      [psid, cutoff]
+    );
+    if (!r.rows[0]) return null;
+    const l = r.rows[0];
+    return { id: l.id, videoId: l.video_id, createdAt: Number(l.created_at), activatedAt: l.activated_at ? Number(l.activated_at) : null, deviceToken: l.device_token, senderPsid: l.sender_psid };
   },
   async getLink(id) {
     const r = await pool.query('SELECT * FROM links WHERE id=$1', [id]);
@@ -351,12 +363,19 @@ async function handlePaymentScreenshot(senderId, imageUrl) {
       return;
     }
 
+    // \u0425\u044d\u0440\u044d\u0432 \u044d\u043d\u044d \u0445\u04af\u043d 24 \u0446\u0430\u0433\u0442 \u0430\u043b\u044c \u0445\u044d\u0434\u0438\u0439\u043d \u043b\u0438\u043d\u043a \u0430\u0432\u0441\u0430\u043d \u0431\u043e\u043b \u0434\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430
+    const existingLink = await db.getLinkBySender(senderId);
+    if (existingLink) {
+      const existingUrl = process.env.BASE_URL + '/watch/' + existingLink.id;
+      await sendFbMessage(senderId, '\u2705 \u0422\u0430\u043d\u044b \u043b\u0438\u043d\u043a \u0430\u043b\u044c \u0445\u044d\u0434\u0438\u0439\u043d \u04af\u04af\u0441\u0441\u044d\u043d \u0431\u0430\u0439\u043d\u0430!\n\n' + existingUrl + '\n\n\u23f0 24 \u0446\u0430\u0433\u0438\u0439\u043d \u0434\u043e\u0442\u043e\u0440 \u04af\u0437\u043d\u044d \u04af\u04af.');
+      return;
+    }
     const video = await db.getLatestVideo();
     if (!video) { await sendFbMessage(senderId, '\u041e\u0434\u043e\u043e\u0433\u043e\u043e\u0440 \u0438\u0434\u044d\u0432\u0445\u0442\u044d\u0439 \u0432\u0438\u0434\u0435\u043e \u0431\u0430\u0439\u0445\u0433\u04af\u0439.'); return; }
     const linkId = nanoid(10);
-    await db.saveLink(linkId, { id: linkId, videoId: video.id, createdAt: Date.now() });
+    await db.saveLink(linkId, { id: linkId, videoId: video.id, createdAt: Date.now(), senderPsid: senderId });
     const linkUrl = process.env.BASE_URL + '/watch/' + linkId;
-    await sendFbMessage(senderId, '\u2705 \u0422\u04e9\u043b\u0431\u04e9\u0440 \u0431\u0430\u0442\u0430\u043b\u0433\u0430\u0430\u0436\u043b\u0430\u0430!\n\n\u0422\u0430\u043d\u044b \u0432\u0438\u0434\u0435\u043e \u043b\u0438\u043d\u043a:\n' + linkUrl + '\n\n\u23f0 24 \u0446\u0430\u0433\u0438\u0439\u043d \u0434\u043e\u0442\u043e\u0440 \u04af\u0437\u043d\u044d \u04af\u04af.\n\u1f512 \u041b\u0438\u043d\u043a \u0437\u04e9\u0432\u0445\u04e9\u043d \u0442\u0430\u043d\u044b \u0442\u04e9\u0445\u04e9\u04e9\u0440\u04e9\u043c\u0436\u0438\u0434 \u0430\u0436\u0438\u043b\u043b\u0430\u043d\u0430.');
+    await sendFbMessage(senderId, '\u2705 \u0422\u04e9\u043b\u0431\u04e9\u0440 \u0431\u0430\u0442\u0430\u043b\u0433\u0430\u0430\u0436\u043b\u0430\u0430!\n\n\u0422\u0430\u043d\u044b \u0432\u0438\u0434\u0435\u043e \u043b\u0438\u043d\u043a:\n' + linkUrl + '\n\n\u23f0 24 \u0446\u0430\u0433\u0438\u0439\u043d \u0434\u043e\u0442\u043e\u0440 \u04af\u0437\u043d\u044d \u04af\u04af.');
   } catch(err) {
     console.error('Screenshot error:', err);
     await sendFbMessage(senderId, '\u0421\u043a\u0440\u0438\u0439\u043d\u0448\u043e\u0442 \u0431\u043e\u043b\u043e\u0432\u0441\u0440\u0443\u0443\u043b\u0430\u0445\u0430\u0434 \u0430\u043b\u0434\u0430\u0430 \u0433\u0430\u0440\u043b\u0430\u0430. \u0414\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.');
