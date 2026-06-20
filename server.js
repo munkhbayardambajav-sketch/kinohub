@@ -241,7 +241,7 @@ app.get('/stream/:linkId', async (req, res) => {
   const video = await db.getVideo(link.videoId);
   if (!video) return res.status(404).json({ error: '\u0412\u0438\u0434\u0435\u043e \u043e\u043b\u0434\u0441\u043e\u043d\u0433\u04af\u0439' });
   try {
-    const command = new GetObjectCommand({ Bucket: BUCKET, Key: video.key });
+    const command = new GetObjectCommand({ Bucket: BUCKET, Key: video.key || video.filename });
     const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
     res.redirect(signedUrl);
   } catch (err) { console.error('stream error:', err); res.status(500).json({ error: err.message }); }
