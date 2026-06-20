@@ -123,46 +123,27 @@ app.get('/admin/links', requireAdmin, (req, res) => res.json(Object.values(db.da
 
 // Watch: нэг линк = нэг хүн = нэг төхөөрөмж
 app.get('/watch/:linkId', async (req, res) => {
-  const { linkId } = req.params;
-  const link = db.getLink(linkId);
-  if (!link) return res.status(404).send(`<!DOCTYPE html><html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:sans-serif"><h2>Линк олдсонгүй</h2></body></html>`);
-
-  const age = Date.now() - link.createdAt;
-  if (age > 72 * 60 * 60 * 1000) return res.status(410).send(`<!DOCTYPE html><html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:sans-serif"><h2>⏰ Линкийн хугацаа дууссан</h2><p>72 цагийн хугацаа өнгөрсөн байна.</p></body></html>`);
-
-  // IP-based locking
-  const userIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
-  if (link.lockedIp && link.lockedIp !== userIp) {
-    return res.status(403).send(`<!DOCTYPE html><html><body style="background:#000;color:#f66;text-align:center;padding:50px;font-family:sans-serif"><h2>🔒 Хандах боломжгүй</h2><p>Энэ линкийг өөр сүлжээнээс аль хэдийн нээсэн байна.</p><p>Линк зөвхөн нэг хүнд зориулагдсан.</p></body></html>`);
-  }
-  if (!link.lockedIp && userIp) {
-    db.updateLink(linkId, { lockedIp: userIp });
-  }
-
-  const video = db.getVideo(link.videoId);
-  if (!video) return res.status(404).send(`<!DOCTYPE html><html><body style="background:#000;color:#fff;text-align:center;padding:50px;font-family:sans-serif"><h2>Видео олдсонгүй</h2></body></html>`);
-
   try {
+    const { linkId } = req.params;
+    const link = db.getLink(linkId);
+    if (!link) {
+      return res.status(404).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px"><h2>Линк олдсонгүй</h2></body></html>');
+    }
+    const age = Date.now() - link.createdAt;
+    if (age > 72 * 60 * 60 * 1000) {
+      return res.status(410).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px"><h2>Линкийн хугацаа дууссан</h2></body></html>');
+    }
+    const video = db.getVideo(link.videoId);
+    if (!video) {
+      return res.status(404).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px"><h2>Видео олдсонгүй</h2></body></html>');
+    }
     const command = new GetObjectCommand({ Bucket: BUCKET, Key: video.r2Key || video.filename });
     const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
-    res.send(`<!DOCTYPE html>
-<html lang="mn">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Видео үзэх</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh}video{max-width:100%;max-height:100vh;width:100%}</style>
-</head>
-<body>
-<video controls autoplay controlsList="nodownload" oncontextmenu="return false">
-<source src="${signedUrl}" type="video/mp4">
-</video>
-<script>document.addEventListener('keydown',function(e){if(e.key==='PrintScreen')e.preventDefault();});</script>
-</body>
-</html>`);
-  } catch(err) {
+    const html = '<!DOCTYPE html><html lang="mn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Видео</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh}video{max-width:100%;width:100%}</style></head><body><video controls autoplay controlsList="nodownload" oncontextmenu="return false"><source src="' + signedUrl + '" type="video/mp4"></video></body></html>';
+    res.send(html);
+  } catch (err) {
     console.error('Watch error:', err);
-    res.status(500).send('Видео ачааллахад алдаа гарлаа');
+    res.status(500).send('<html><body style="background:#000;color:#fff;text-align:center;padding:50px"><h2>Алдаа гарлаа</h2><p>' + (err.message || '') + '</p></body></html>');
   }
 })
 app.get('/stream/:linkId', async (req, res) => {
