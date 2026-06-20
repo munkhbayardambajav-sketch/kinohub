@@ -302,10 +302,7 @@ async function sendBankInfo(recipientId) {
 
 async function handlePaymentScreenshot(senderId, imageUrl) {
   try {
-    const profileRes = await fetch('https://graph.facebook.com/v19.0/' + senderId + '?fields=name&access_token=' + process.env.FB_PAGE_TOKEN);
-    const profile = await profileRes.json();
-    const fbName = (profile.name || '').toLowerCase().trim();
-    console.log('FB name:', fbName, 'imageUrl:', imageUrl ? 'present' : 'missing');
+    console.log('imageUrl:', imageUrl ? 'present' : 'missing');
 
     if (!imageUrl) {
       await sendFbMessage(senderId, '\u0417\u0443\u0440\u0430\u0433\u043d\u044b \u043b\u0438\u043d\u043a \u0430\u043b\u0434\u0441\u0430\u043d. \u0414\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.');
@@ -339,19 +336,8 @@ async function handlePaymentScreenshot(senderId, imageUrl) {
 
     const accountOk = rawText.includes('5300692947');
 
-    let descLower = '';
-    try {
-      const m = rawText.match(/description["\s]*:["\s]*"([^"]+)"/);
-      if (m) descLower = m[1].toLowerCase();
-    } catch(e) {}
-    const nameOk = fbName && fbName.split(' ').some(part => part.length > 1 && descLower.includes(part));
-
     if (!accountOk) {
       await sendFbMessage(senderId, '\u274c \u0414\u0430\u043d\u0441\u043d\u044b \u0434\u0443\u0433\u0430\u0430\u0440 \u0442\u0430\u0430\u0440\u0441\u0430\u043d\u0433\u04af\u0439.\n\n\u0428\u0438\u043b\u0436\u04af\u04af\u043b\u044d\u0445 \u0434\u0430\u043d\u0441: MN54 000500 5300692947 (\u0425\u0430\u0430\u043d \u0431\u0430\u043d\u043a)\n\n\u0417\u04e9\u0432 \u0434\u0430\u043d\u0441\u0430\u043d\u0434 \u0448\u0438\u043b\u0436\u04af\u04af\u043b\u044d\u044d\u0434 screenshot \u0434\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.');
-      return;
-    }
-    if (!nameOk) {
-      await sendFbMessage(senderId, '\u274c \u0413\u04af\u0439\u043b\u0433\u044d\u044d\u043d\u0438\u0439 \u0443\u0442\u0433\u0430 \u0434\u044d\u044d\u0440 \u0442\u0430\u043d\u044b \u0444\u044d\u0439\u0441\u0431\u04af\u04af\u043a \u043d\u044d\u0440 ("' + profile.name + '") \u043e\u043b\u0434\u0441\u043e\u043d\u0433\u04af\u0439.\n\n\u0413\u04af\u0439\u043b\u0433\u044d\u044d\u043d\u0438\u0439 \u0443\u0442\u0433\u0430 \u0434\u044d\u044d\u0440 \u04e9\u04e9\u0440\u0438\u0439\u043d \u0444\u044d\u0439\u0441\u0431\u04af\u04af\u043a \u043d\u044d\u0440\u0438\u0439\u0433 \u0431\u0438\u0447\u044d\u044d\u0434 \u0434\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.');
       return;
     }
 
