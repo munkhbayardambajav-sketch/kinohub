@@ -323,18 +323,19 @@ async function handlePaymentScreenshot(senderId, imageUrl) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 10,
+        max_tokens: 500,
         messages: [{ role: 'user', content: [
           { type: 'image', source: { type: 'base64', media_type: contentType, data: base64Img } },
-          { type: 'text', text: 'Does this image show a bank transfer/payment to account number 5300692947 (may appear with spaces like "5300 692947" or "53006 92947")? Reply with only YES or NO.' }
+          { type: 'text', text: 'Extract ALL numbers and text from this image. Return only the raw text you see, nothing else.' }
         ]}]
       })
     });
     const claudeData = await claudeRes.json();
-    const rawText = ((claudeData.content && claudeData.content[0] && claudeData.content[0].text) || '').trim().toUpperCase();
-    console.log('Claude answer:', rawText);
+    const rawText = ((claudeData.content && claudeData.content[0] && claudeData.content[0].text) || '');
+    const rawNoSpace = rawText.replace(/[\s\-]/g, '');
+    console.log('Claude OCR:', rawText.slice(0, 200));
 
-    const accountOk = rawText.startsWith('YES');
+    const accountOk = rawNoSpace.includes('5300692947');
 
     if (!accountOk) {
       await sendFbMessage(senderId, '\u274c \u0414\u0430\u043d\u0441\u043d\u044b \u0434\u0443\u0433\u0430\u0430\u0440 \u0442\u0430\u0430\u0440\u0441\u0430\u043d\u0433\u04af\u0439.\n\n\u0428\u0438\u043b\u0436\u04af\u04af\u043b\u044d\u0445 \u0434\u0430\u043d\u0441: MN54 000500 5300692947 (\u0425\u0430\u0430\u043d \u0431\u0430\u043d\u043a)\n\n\u0417\u04e9\u0432 \u0434\u0430\u043d\u0441\u0430\u043d\u0434 \u0448\u0438\u043b\u0436\u04af\u04af\u043b\u044d\u044d\u0434 screenshot \u0434\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.');
