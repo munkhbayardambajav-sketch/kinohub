@@ -264,12 +264,16 @@ app.post('/webhook', async (req, res) => {
       }
     }
     for (const change of (entry.changes || [])) {
-      if (change.field === 'feed' && change.value && change.value.item === 'comment') {
+      console.log('CHANGE:', JSON.stringify(change).slice(0, 300));
+      if (change.field === 'feed' && change.value) {
+        const item = change.value.item;
         const comment = (change.value.message || '').trim();
         const commentId = change.value.comment_id;
-        if (!commentId) continue;
-        if (comment === '1' || /\u0430\u0432\u043d\u0430|\u04af\u0437\u043d\u044d|\u0430\u0432\u043c\u0430\u0430\u0440/i.test(comment)) {
-          await sendPrivateReply(commentId);
+        console.log('FEED item:', item, 'comment:', comment, 'commentId:', commentId);
+        if (item === 'comment' && commentId) {
+          if (comment === '1' || /\u0430\u0432\u043d\u0430|\u04af\u0437\u043d\u044d|\u0430\u0432\u043c\u0430\u0430\u0440/i.test(comment)) {
+            await sendPrivateReply(commentId);
+          }
         }
       }
     }
