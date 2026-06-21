@@ -266,6 +266,7 @@ app.post('/webhook', async (req, res) => {
   if (body.object !== 'page') return res.status(404).end();
   res.status(200).send('EVENT_RECEIVED');
   for (const entry of (body.entry || [])) {
+    const pageToken = getPageToken(entry.id);
     for (const event of (entry.messaging || [])) {
       const senderId = event.sender && event.sender.id;
       if (!senderId || senderId === entry.id) continue;
@@ -274,9 +275,9 @@ app.post('/webhook', async (req, res) => {
         if (isRealImage) {
           const imgAtt = (event.message.attachments || []).find(a => a.type === 'image' && !(a.payload && a.payload.sticker_id));
           const imageUrl = imgAtt && imgAtt.payload && imgAtt.payload.url;
-          await handlePaymentScreenshot(senderId, imageUrl);
+          await handlePaymentScreenshot(senderId, imageUrl, pageToken);
         } else if (event.message.text && !event.message.is_echo) {
-          await sendBankInfo(senderId);
+          await sendBankInfo(senderId, pageToken);
         }
       }
     }
@@ -289,7 +290,7 @@ app.post('/webhook', async (req, res) => {
         console.log('FEED item:', item, 'comment:', comment, 'commentId:', commentId);
         if (item === 'comment' && commentId) {
           if (comment === '1' || /\u0430\u0432\u043d\u0430|\u04af\u0437\u043d\u044d|\u0430\u0432\u043c\u0430\u0430\u0440/i.test(comment)) {
-            await sendPrivateReply(commentId);
+            await sendPrivateReply(commentId, pageToken);
           }
         }
       }
@@ -297,7 +298,14 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-async function sendBankInfo(recipientId) {
+function getPageToken(pageId) {
+  const tokens = {};
+  if (process.env.FB_PAGE_ID_1 && process.env.FB_PAGE_TOKEN_1) tokens[process.env.FB_PAGE_ID_1] = process.env.FB_PAGE_TOKEN_1;
+  if (process.env.FB_PAGE_ID_2 && process.env.FB_PAGE_TOKEN_2) tokens[process.env.FB_PAGE_ID_2] = process.env.FB_PAGE_TOKEN_2;
+  return tokens[pageId] || process.env.FB_PAGE_TOKEN || null;
+}
+
+async function sendBankInfo(recipientId, pageToken) {
   await sendFbMessage(recipientId, `\u2705 "\u0410\u0430\u0432\u044b\u043d \u043d\u0430\u0439\u0437 \u043e\u0445\u0438\u043d" \u043a\u0438\u043d\u043e \u04af\u0437\u044d\u0445\u0438\u0439\u0433 \u0445\u04af\u0441\u0432\u044d\u043b
 \u1f37f \u041a\u0438\u043d\u043e \u04af\u0437\u044d\u0445\u0438\u0439\u0433 \u0445\u04af\u0441\u0432\u044d\u043b \u0434\u043e\u043e\u0440\u0445 \u0437\u0430\u0430\u0432\u0440\u044b\u0433 \u0434\u0430\u0433\u0430\u0430\u0440\u0430\u0439:
 
@@ -321,12 +329,12 @@ async function sendBankInfo(recipientId) {
 \u041a\u0438\u043d\u043e \u04af\u0437\u044d\u0445\u044d\u0434 \u0431\u044d\u043b\u044d\u043d \u0431\u043e\u043b\u0441\u043e\u043d \u0443\u0443? \u1f680`);
 }
 
-async function handlePaymentScreenshot(senderId, imageUrl) {
+async function handlePaymentScreenshot(senderId, imageUrl, pageToken) {
   try {
     console.log('imageUrl:', imageUrl ? 'present' : 'missing');
 
     if (!imageUrl) {
-      await sendFbMessage(senderId, '\u0417\u0443\u0440\u0430\u0433\u043d\u044b \u043b\u0438\u043d\u043a \u0430\u043b\u0434\u0441\u0430\u043d. \u0414\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.');
+      await sendFbMessage(senderId, '\u0417\u0443\u0440\u0430\u0433\u043d\u044b \u043b\u0438\u043d\u043a \u0430\u043b\u0434\u0441\u0430\u043d. \u0414\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.', pageToken);
       return;
     }
 
@@ -358,7 +366,7 @@ async function handlePaymentScreenshot(senderId, imageUrl) {
     const accountOk = rawText.startsWith('YES');
 
     if (!accountOk) {
-      await sendFbMessage(senderId, '\u274c \u0414\u0430\u043d\u0441\u043d\u044b \u0434\u0443\u0433\u0430\u0430\u0440 \u0442\u0430\u0430\u0440\u0441\u0430\u043d\u0433\u04af\u0439.\n\n\u0428\u0438\u043b\u0436\u04af\u04af\u043b\u044d\u0445 \u0434\u0430\u043d\u0441: MN54 000500 5300692947 (\u0425\u0430\u0430\u043d \u0431\u0430\u043d\u043a)\n\n\u0417\u04e9\u0432 \u0434\u0430\u043d\u0441\u0430\u043d\u0434 \u0448\u0438\u043b\u0436\u04af\u04af\u043b\u044d\u044d\u0434 screenshot \u0434\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.');
+      await sendFbMessage(senderId, '\u274c \u0414\u0430\u043d\u0441\u043d\u044b \u0434\u0443\u0433\u0430\u0430\u0440 \u0442\u0430\u0430\u0440\u0441\u0430\u043d\u0433\u04af\u0439.\n\n\u0428\u0438\u043b\u0436\u04af\u04af\u043b\u044d\u0445 \u0434\u0430\u043d\u0441: MN54 000500 5300692947 (\u0425\u0430\u0430\u043d \u0431\u0430\u043d\u043a)\n\n\u0417\u04e9\u0432 \u0434\u0430\u043d\u0441\u0430\u043d\u0434 \u0448\u0438\u043b\u0436\u04af\u04af\u043b\u044d\u044d\u0434 screenshot \u0434\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.', pageToken);
       return;
     }
 
@@ -366,23 +374,23 @@ async function handlePaymentScreenshot(senderId, imageUrl) {
     const existingLink = await db.getLinkBySender(senderId);
     if (existingLink) {
       const existingUrl = process.env.BASE_URL + '/watch/' + existingLink.id;
-      await sendFbMessage(senderId, '\u2705 \u0422\u0430\u043d\u044b \u043b\u0438\u043d\u043a \u0430\u043b\u044c \u0445\u044d\u0434\u0438\u0439\u043d \u04af\u04af\u0441\u0441\u044d\u043d \u0431\u0430\u0439\u043d\u0430!\n\n' + existingUrl + '\n\n\u23f0 24 \u0446\u0430\u0433\u0438\u0439\u043d \u0434\u043e\u0442\u043e\u0440 \u04af\u0437\u043d\u044d \u04af\u04af.');
+      await sendFbMessage(senderId, '\u2705 \u0422\u0430\u043d\u044b \u043b\u0438\u043d\u043a \u0430\u043b\u044c \u0445\u044d\u0434\u0438\u0439\u043d \u04af\u04af\u0441\u0441\u044d\u043d \u0431\u0430\u0439\u043d\u0430!\n\n' + existingUrl + '\n\n\u23f0 24 \u0446\u0430\u0433\u0438\u0439\u043d \u0434\u043e\u0442\u043e\u0440 \u04af\u0437\u043d\u044d \u04af\u04af.', pageToken);
       return;
     }
     const video = await db.getLatestVideo();
-    if (!video) { await sendFbMessage(senderId, '\u041e\u0434\u043e\u043e\u0433\u043e\u043e\u0440 \u0438\u0434\u044d\u0432\u0445\u0442\u044d\u0439 \u0432\u0438\u0434\u0435\u043e \u0431\u0430\u0439\u0445\u0433\u04af\u0439.'); return; }
+    if (!video) { await sendFbMessage(senderId, '\u041e\u0434\u043e\u043e\u0433\u043e\u043e\u0440 \u0438\u0434\u044d\u0432\u0445\u0442\u044d\u0439 \u0432\u0438\u0434\u0435\u043e \u0431\u0430\u0439\u0445\u0433\u04af\u0439.', pageToken); return; }
     const linkId = nanoid(10);
     await db.saveLink(linkId, { id: linkId, videoId: video.id, createdAt: Date.now(), senderPsid: senderId });
     const linkUrl = process.env.BASE_URL + '/watch/' + linkId;
-    await sendFbMessage(senderId, '\u2705 \u0422\u04e9\u043b\u0431\u04e9\u0440 \u0431\u0430\u0442\u0430\u043b\u0433\u0430\u0430\u0436\u043b\u0430\u0430!\n\n\u0422\u0430\u043d\u044b \u0432\u0438\u0434\u0435\u043e \u043b\u0438\u043d\u043a:\n' + linkUrl + '\n\n\u23f0 24 \u0446\u0430\u0433\u0438\u0439\u043d \u0434\u043e\u0442\u043e\u0440 \u04af\u0437\u043d\u044d \u04af\u04af.');
+    await sendFbMessage(senderId, '\u2705 \u0422\u04e9\u043b\u0431\u04e9\u0440 \u0431\u0430\u0442\u0430\u043b\u0433\u0430\u0430\u0436\u043b\u0430\u0430!\n\n\u0422\u0430\u043d\u044b \u0432\u0438\u0434\u0435\u043e \u043b\u0438\u043d\u043a:\n' + linkUrl + '\n\n\u23f0 24 \u0446\u0430\u0433\u0438\u0439\u043d \u0434\u043e\u0442\u043e\u0440 \u04af\u0437\u043d\u044d \u04af\u04af.', pageToken);
   } catch(err) {
     console.error('Screenshot error:', err);
-    await sendFbMessage(senderId, '\u0421\u043a\u0440\u0438\u0439\u043d\u0448\u043e\u0442 \u0431\u043e\u043b\u043e\u0432\u0441\u0440\u0443\u0443\u043b\u0430\u0445\u0430\u0434 \u0430\u043b\u0434\u0430\u0430 \u0433\u0430\u0440\u043b\u0430\u0430. \u0414\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.');
+    await sendFbMessage(senderId, '\u0421\u043a\u0440\u0438\u0439\u043d\u0448\u043e\u0442 \u0431\u043e\u043b\u043e\u0432\u0441\u0440\u0443\u0443\u043b\u0430\u0445\u0430\u0434 \u0430\u043b\u0434\u0430\u0430 \u0433\u0430\u0440\u043b\u0430\u0430. \u0414\u0430\u0445\u0438\u043d \u044f\u0432\u0443\u0443\u043b\u043d\u0430 \u0443\u0443.', pageToken);
   }
 }
 
-async function sendFbMessage(recipientId, text) {
-  const pageToken = process.env.FB_PAGE_TOKEN;
+async function sendFbMessage(recipientId, text, pageToken) {
+  pageToken = pageToken || process.env.FB_PAGE_TOKEN;
   if (!pageToken) return;
   try {
     const r = await fetch('https://graph.facebook.com/v19.0/me/messages?access_token=' + pageToken, {
@@ -395,8 +403,8 @@ async function sendFbMessage(recipientId, text) {
   } catch (err) { console.error('sendFbMessage error:', err); }
 }
 
-async function sendPrivateReply(commentId) {
-  const pageToken = process.env.FB_PAGE_TOKEN;
+async function sendPrivateReply(commentId, pageToken) {
+  pageToken = pageToken || process.env.FB_PAGE_TOKEN;
   if (!pageToken) return;
   const message = `✅ "Аавын найз охин" кино үзэхийг хүсвэл дараах мэдээллээр төлбөр төлнө үү:
 
