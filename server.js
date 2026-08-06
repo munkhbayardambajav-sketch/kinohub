@@ -306,7 +306,7 @@ function getPageToken(pageId) {
 }
 
 async function sendBankInfo(recipientId, pageToken) {
-  await sendFbMessage(recipientId, `\u2705 "\u0410\u0430\u0432\u044b\u043d \u043d\u0430\u0439\u0437 \u043e\u0445\u0438\u043d" \u043a\u0438\u043d\u043e \u04af\u0437\u044d\u0445\u0438\u0439\u0433 \u0445\u04af\u0441\u0432\u044d\u043b
+    await sendFbMessage(recipientId, `✅ Кино үзэхийг хүсвэл
 \u1f37f \u041a\u0438\u043d\u043e \u04af\u0437\u044d\u0445\u0438\u0439\u0433 \u0445\u04af\u0441\u0432\u044d\u043b \u0434\u043e\u043e\u0440\u0445 \u0437\u0430\u0430\u0432\u0440\u044b\u0433 \u0434\u0430\u0433\u0430\u0430\u0440\u0430\u0439:
 
 \u1f4b0 \u0422\u04e9\u043b\u0431\u04e9\u0440 \u0448\u0438\u043b\u0436\u04af\u04af\u043b\u044d\u0445 \u043c\u044d\u0434\u044d\u044d\u043b\u044d\u043b:
@@ -406,7 +406,7 @@ async function sendFbMessage(recipientId, text, pageToken) {
 async function sendPrivateReply(commentId, pageToken) {
   pageToken = pageToken || process.env.FB_PAGE_TOKEN;
   if (!pageToken) return;
-  const message = `✅ "Аавын найз охин" кино үзэхийг хүсвэл дараах мэдээллээр төлбөр төлнө үү:
+  const message = `✅ Кино үзэхийг хүсвэл дараах мэдээллээр төлбөр төлнө үү:
 
 💰 Төлбөр шилжүүлэх мэдээлэл:
 • Банк: Хаан банк 🏦
