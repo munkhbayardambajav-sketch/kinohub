@@ -271,6 +271,7 @@ app.post('/webhook', async (req, res) => {
       const senderId = event.sender && event.sender.id;
       if (!senderId || senderId === entry.id) continue;
       if (event.message) {
+            console.log('MSG event pageId:', entry.id, 'sender:', senderId, 'hasText:', !!event.message.text, 'hasAttachments:', !!(event.message.attachments && event.message.attachments.length), 'isEcho:', !!event.message.is_echo);
         const isRealImage = (event.message.attachments || []).some(a => a.type === 'image' && !(a.payload && a.payload.sticker_id));
         if (isRealImage) {
           const imgAtt = (event.message.attachments || []).find(a => a.type === 'image' && !(a.payload && a.payload.sticker_id));
