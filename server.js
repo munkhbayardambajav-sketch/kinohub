@@ -307,7 +307,7 @@ function getPageToken(pageId) {
 }
 
 async function sendBankInfo(recipientId, pageToken) {
-      await sendFbMessage(recipientId, `Кино үзэхийг хүсвэл доорх зааврыг дагаарай:\nТөлбөр шилжүүлэх мэдээлэл:\n\nБанк: Хаан банк\nДансны дугаар: mn 54000 500 5300692947\nДанс эзэмшигч: Дамбажав Мөнхбаяр\nТөлбөрийн дүн: 5000 төгрөг\n\nГүйлгээний утга (заавал бичнэ!):\n→ Өөрийн Facebook нэрээ бичээрэй\nДараагийн алхам:\n\nГүйлгээ амжилттай болсны скриншотыг авна уу\nЭнэ чат руу явуулна уу\n\nХугацаа:\n\nТөлбөр баталгаажсаны дараа линк автоматаар ирнэ\nЛинк 24 цаг (1 хоног) хүчинтэй байна`);
+      await sendFbMessage(recipientId, `https://kino-hub.mn/ энэ линкээр орж киногоо үзээрэй`);
 }
 
 async function handlePaymentScreenshot(senderId, imageUrl, pageToken) {
