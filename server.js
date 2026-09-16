@@ -307,7 +307,7 @@ function getPageToken(pageId) {
 }
 
 async function sendBankInfo(recipientId, pageToken) {
-      await sendFbMessage(recipientId, `https://kino-hub.mn/ сайтаар орж киногоо үзээрэй. Safari болон Chrome-оор сайтруугаа хандаарай.`);
+      await sendFbMessage(recipientId, `https://kino-hub.mn/ сайтаар орж киногоо үзээрэй.`);
 }
 
 async function handlePaymentScreenshot(senderId, imageUrl, pageToken) {
