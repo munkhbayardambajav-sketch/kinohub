@@ -270,16 +270,9 @@ app.post('/webhook', async (req, res) => {
     for (const event of (entry.messaging || [])) {
       const senderId = event.sender && event.sender.id;
       if (!senderId || senderId === entry.id) continue;
-      if (event.message) {
-            console.log('MSG event pageId:', entry.id, 'sender:', senderId, 'hasText:', !!event.message.text, 'hasAttachments:', !!(event.message.attachments && event.message.attachments.length), 'isEcho:', !!event.message.is_echo);
-        const isRealImage = (event.message.attachments || []).some(a => a.type === 'image' && !(a.payload && a.payload.sticker_id));
-        if (isRealImage) {
-          const imgAtt = (event.message.attachments || []).find(a => a.type === 'image' && !(a.payload && a.payload.sticker_id));
-          const imageUrl = imgAtt && imgAtt.payload && imgAtt.payload.url;
-          await handlePaymentScreenshot(senderId, imageUrl, pageToken);
-        } else if (event.message.text && !event.message.is_echo) {
-          await sendBankInfo(senderId, pageToken);
-        }
+      if (event.message && !event.message.is_echo) {
+        console.log('MSG event pageId:', entry.id, 'sender:', senderId);
+        await sendBankInfo(senderId, pageToken);
       }
     }
     for (const change of (entry.changes || [])) {
